@@ -100,9 +100,15 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             'rewrite' => ['slug' => $tax['slug']],
                         ];
                         
+                        // START OF FIX: مشکل از اینجا بود
+                        // با حذف شرط زیر، به وردپرس اجازه می‌دهیم تا خودش متا باکس استاندارد را برای تگ‌ها بسازد
+                        // و دیگر نیازی به ساخت دستی آن نیست. این کار باعث می‌شود اسکریپت‌های لازم به درستی متصل شوند.
+                        /*
                         if(!$is_hierarchical) {
                             $args['meta_box_cb'] = false;
                         }
+                        */
+                        // END OF FIX
 
                         register_taxonomy($tax['slug'], ['wpd_listing'], $args);
                     }
@@ -115,6 +121,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             add_meta_box( 'wpd_field_builder_mb', __( 'فیلد ساز', 'wp-directory' ), [ $this, 'render_field_builder_metabox' ], 'wpd_listing_type', 'normal', 'high' );
             add_meta_box( 'wpd_taxonomy_builder_mb', __( 'طبقه‌بندی ساز', 'wp-directory' ), [ $this, 'render_taxonomy_builder_metabox' ], 'wpd_listing_type', 'normal', 'default' );
 
+            // START OF FIX: این بخش حذف شد
+            // چون وردپرس بعد از اصلاح بالا، خودش متا باکس‌ها را به درستی اضافه می‌کند،
+            // دیگر نیازی به افزودن دستی آن‌ها در اینجا نیست.
+            /*
             $listing_types = get_posts(['post_type' => 'wpd_listing_type', 'numberposts' => -1, 'post_status' => 'publish']);
             if(empty($listing_types)) return;
             foreach($listing_types as $type_post) {
@@ -136,11 +146,13 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     }
                 }
             }
+            */
+            // END OF FIX
         }
 
         public function remove_default_meta_boxes() {
             remove_meta_box( 'postimagediv', 'wpd_listing', 'side' );
-            remove_meta_box( 'tagsdiv-post_tag', 'wpd_listing', 'side' );
+            // remove_meta_box( 'tagsdiv-post_tag', 'wpd_listing', 'side' ); // این خط را کامنت یا حذف کنید تا تگ پیش‌فرض وردپرس در صورت نیاز قابل استفاده باشد
             remove_meta_box( 'commentstatusdiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'commentsdiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'slugdiv', 'wpd_listing', 'normal' );
@@ -162,8 +174,8 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             <input type="text" name="wpd_taxonomies[<?php echo $index; ?>][name]" value="<?php echo esc_attr( $tax['name'] ?? '' ); ?>" placeholder="<?php _e( 'نام طبقه‌بندی (فارسی)', 'wp-directory' ); ?>">
                             <input type="text" name="wpd_taxonomies[<?php echo $index; ?>][slug]" value="<?php echo esc_attr( $tax['slug'] ?? '' ); ?>" placeholder="<?php _e( 'نامک (انگلیسی)', 'wp-directory' ); ?>">
                             <select name="wpd_taxonomies[<?php echo $index; ?>][hierarchical]">
-                                <option value="1" <?php selected( $tax['hierarchical'], '1' ); ?>><?php _e('سلسله مراتبی', 'wp-directory'); ?></option>
-                                <option value="0" <?php selected( $tax['hierarchical'], '0' ); ?>><?php _e('غیر سلسله مراتبی (تگ)', 'wp-directory'); ?></option>
+                                <option value="1" <?php selected( $tax['hierarchical'] ?? '1', '1' ); ?>><?php _e('سلسله مراتبی', 'wp-directory'); ?></option>
+                                <option value="0" <?php selected( $tax['hierarchical'] ?? '1', '0' ); ?>><?php _e('غیر سلسله مراتبی (تگ)', 'wp-directory'); ?></option>
                             </select>
                         </div>
                         <a href="#" class="button wpd-remove-field"><?php _e( 'حذف', 'wp-directory' ); ?></a>
@@ -393,7 +405,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     jQuery(document).ready(function($) {
                         function hideAllTaxonomyMetaboxes() {
                              $('#side-sortables').find('.postbox[id*="div"]').each(function(){
-                                if($(this).attr('id') !== 'submitdiv') {
+                                // متا باکس‌های اصلی وردپرس و متا باکس نوع آگهی را پنهان نکن
+                                var id = $(this).attr('id');
+                                if(id !== 'submitdiv' && id !== 'wpd_listing_type_mb') {
                                     $(this).hide();
                                 }
                              });
@@ -428,6 +442,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                         fields_container.html(response.data.fields);
                                         if(response.data.taxonomies && response.data.taxonomies.length > 0) {
                                             response.data.taxonomies.forEach(function(tax_slug) {
+                                                // وردپرس برای طبقه‌بندی‌های سلسله مراتبی از id='[slug]div' و برای غیرسلسله مراتبی از id='tagsdiv-[slug]' استفاده می‌کند
                                                 $('#' + tax_slug + 'div, #tagsdiv-' + tax_slug).show();
                                             });
                                         }
