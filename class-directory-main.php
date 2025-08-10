@@ -79,6 +79,7 @@ if ( ! class_exists( 'Directory_Main' ) ) {
          */
         private function init_hooks() {
             add_action( 'init', [ $this, 'load_textdomain' ] );
+            add_action( 'wpd_daily_scheduled_events', [ $this, 'run_daily_events' ] );
         }
 
         /**
@@ -185,9 +186,10 @@ if ( ! class_exists( 'Directory_Main' ) ) {
 
                 // Statuses & Labels
                 'status' => __( 'وضعیت', 'wp-directory' ),
-                'active' => __( 'فعال', 'wp-directory' ),
+                'publish' => __( 'منتشر شده', 'wp-directory' ),
                 'pending' => __( 'در انتظار تایید', 'wp-directory' ),
                 'expired' => __( 'منقضی شده', 'wp-directory' ),
+                'draft' => __( 'پیش‌نویس', 'wp-directory' ),
                 'date_published' => __( 'تاریخ انتشار', 'wp-directory' ),
                 'expires_on' => __( 'تاریخ انقضا', 'wp-directory' ),
                 
@@ -201,15 +203,187 @@ if ( ! class_exists( 'Directory_Main' ) ) {
         }
 
         /**
-         * تابع کمکی برای ارسال اعلان (ایمیل یا پیامک)
-         *
-         * @param string $event نام رویداد (مثلاً 'new_listing')
-         * @param int $user_id شناسه کاربر
-         * @param int $listing_id شناسه آگهی
+         * لیست رویدادهای اعلان‌ها
+         * @return array
          */
-        public static function send_notification($event, $user_id, $listing_id = 0) {
-            // این تابع در کلاس Directory_Gateways پیاده‌سازی خواهد شد
-            // Directory_Gateways::send_notification($event, $user_id, $listing_id);
+        public static function get_notification_events() {
+            return [
+                'new_user' => ['label' => 'ثبت‌نام کاربر جدید', 'vars' => ['{site_name}', '{user_name}']],
+                'new_listing' => ['label' => 'ثبت آگهی جدید (در انتظار تایید)', 'vars' => ['{site_name}', '{user_name}', '{listing_title}']],
+                'listing_approved' => ['label' => 'تایید آگهی', 'vars' => ['{site_name}', '{user_name}', '{listing_title}', '{listing_url}']],
+                'listing_rejected' => ['label' => 'رد شدن آگهی', 'vars' => ['{site_name}', '{user_name}', '{listing_title}']],
+                'listing_expired' => ['label' => 'انقضای آگهی', 'vars' => ['{site_name}', '{user_name}', '{listing_title}']],
+                'listing_near_expiration' => ['label' => 'نزدیک شدن به انقضای آگهی', 'vars' => ['{site_name}', '{user_name}', '{listing_title}', '{expiration_date}']]
+            ];
+        }
+
+        /**
+         * تابع مرکزی برای ارسال اعلان‌ها
+         * @param string $event نام رویداد
+         * @param array $args آرگومان‌ها (user_id, listing_id, etc.)
+         */
+        public static function trigger_notification($event, $args = []) {
+            $user_id = $args['user_id'] ?? 0;
+            $listing_id = $args['listing_id'] ?? 0;
+            if (empty($user_id)) return;
+
+            $user_info = get_userdata($user_id);
+            if (!$user_info) return;
+
+            // دریافت تنظیمات سراسری
+            $global_settings = self::get_option('notifications', []);
+
+            // دریافت تنظیمات اختصاصی نوع آگهی
+            $type_settings = [];
+            if ($listing_id) {
+                $listing_type_id = get_post_meta($listing_id, '_wpd_listing_type', true);
+                if ($listing_type_id) {
+                    $type_settings = get_post_meta($listing_type_id, '_notification_settings', true);
+                }
+            }
+            
+            // بررسی فعال بودن اعلان
+            $is_email_enabled = ($global_settings["email_enable_{$event}"] ?? 0) && ($type_settings[$event]['email'] ?? 1);
+            $is_sms_enabled = ($global_settings["sms_enable_{$event}"] ?? 0) && ($type_settings[$event]['sms'] ?? 1);
+
+            if (!$is_email_enabled && !$is_sms_enabled) {
+                return;
+            }
+
+            // آماده‌سازی متغیرهای پویا
+            $replacements = [
+                '{site_name}'   => get_bloginfo('name'),
+                '{user_name}'   => $user_info->display_name,
+                '{listing_title}' => $listing_id ? get_the_title($listing_id) : '',
+                '{listing_url}' => $listing_id ? get_permalink($listing_id) : '',
+                '{expiration_date}' => $args['expiration_date'] ?? '',
+            ];
+
+            // ارسال ایمیل
+            if ($is_email_enabled) {
+                $subject = $global_settings["email_subject_{$event}"] ?? '';
+                $body = $global_settings["email_body_{$event}"] ?? '';
+                if (!empty($subject) && !empty($body)) {
+                    $subject = str_replace(array_keys($replacements), array_values($replacements), $subject);
+                    $body = wpautop(str_replace(array_keys($replacements), array_values($replacements), $body));
+                    Directory_Gateways::send_email($user_info->user_email, $subject, $body);
+                }
+            }
+
+            // ارسال پیامک
+            if ($is_sms_enabled) {
+                $pattern_code = $global_settings["sms_pattern_{$event}"] ?? '';
+                $user_phone = get_user_meta($user_id, 'phone_number', true);
+                if (!empty($pattern_code) && !empty($user_phone)) {
+                    // متغیرها باید به ترتیب تعریف شده در پترن باشند
+                    $sms_vars = [];
+                    $event_vars = self::get_notification_events()[$event]['vars'];
+                    foreach($event_vars as $var) {
+                        $sms_vars[] = $replacements[$var] ?? '';
+                    }
+                    Directory_Gateways::send_sms($user_phone, $pattern_code, $sms_vars);
+                }
+            }
+        }
+
+        /**
+         * اجرای رویدادهای روزانه (Cron Job)
+         */
+        public function run_daily_events() {
+            $today = date('Y-m-d H:i:s');
+
+            // 1. یافتن آگهی‌هایی که به زودی منقضی می‌شوند (مثلا ۳ روز دیگر)
+            $near_expiration_date = date('Y-m-d', strtotime('+3 days'));
+            $near_listings = get_posts([
+                'post_type' => 'wpd_listing',
+                'post_status' => 'publish',
+                'posts_per_page' => -1,
+                'meta_query' => [
+                    [
+                        'key' => '_wpd_expiration_date',
+                        'value' => $near_expiration_date . ' 00:00:00',
+                        'compare' => '>=',
+                        'type' => 'DATETIME'
+                    ],
+                    [
+                        'key' => '_wpd_expiration_date',
+                        'value' => $near_expiration_date . ' 23:59:59',
+                        'compare' => '<=',
+                        'type' => 'DATETIME'
+                    ],
+                ]
+            ]);
+
+            foreach ($near_listings as $listing) {
+                self::trigger_notification('listing_near_expiration', [
+                    'user_id' => $listing->post_author,
+                    'listing_id' => $listing->ID,
+                    'expiration_date' => date_i18n('Y/m/d', strtotime(get_post_meta($listing->ID, '_wpd_expiration_date', true)))
+                ]);
+            }
+
+            // 2. یافتن و منقضی کردن آگهی‌هایی که تاریخ انقضایشان گذشته است
+            $expired_listings = get_posts([
+                'post_type' => 'wpd_listing',
+                'post_status' => 'publish',
+                'posts_per_page' => -1,
+                'meta_query' => [
+                    'relation' => 'AND',
+                    [
+                        'key' => '_wpd_expiration_date',
+                        'compare' => 'EXISTS'
+                    ],
+                    [
+                        'key' => '_wpd_expiration_date',
+                        'value' => $today,
+                        'compare' => '<',
+                        'type' => 'DATETIME'
+                    ]
+                ]
+            ]);
+
+            foreach ($expired_listings as $listing) {
+                wp_update_post(['ID' => $listing->ID, 'post_status' => 'expired']);
+                self::trigger_notification('listing_expired', [
+                    'user_id' => $listing->post_author,
+                    'listing_id' => $listing->ID
+                ]);
+            }
+
+            // START OF CHANGE: 3. یافتن و منقضی کردن ارتقاهای آگهی
+            $upgrade_meta_keys = [
+                '_wpd_is_featured' => '_wpd_featured_expires_on',
+                '_wpd_is_urgent' => '_wpd_urgent_expires_on',
+                '_wpd_is_top_of_category' => '_wpd_top_of_category_expires_on',
+            ];
+
+            foreach ($upgrade_meta_keys as $status_key => $expiry_key) {
+                $expired_upgrades = get_posts([
+                    'post_type' => 'wpd_listing',
+                    'post_status' => 'publish',
+                    'posts_per_page' => -1,
+                    'meta_query' => [
+                        'relation' => 'AND',
+                        [
+                            'key' => $status_key,
+                            'value' => '1',
+                            'compare' => '='
+                        ],
+                        [
+                            'key' => $expiry_key,
+                            'value' => $today,
+                            'compare' => '<',
+                            'type' => 'DATETIME'
+                        ]
+                    ]
+                ]);
+
+                foreach ($expired_upgrades as $listing) {
+                    delete_post_meta($listing->ID, $status_key);
+                    delete_post_meta($listing->ID, $expiry_key);
+                }
+            }
+            // END OF CHANGE
         }
     }
 }

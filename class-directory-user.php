@@ -18,13 +18,17 @@ if ( ! class_exists( 'Directory_User' ) ) {
         public function __construct() {
             add_action( 'init', [ $this, 'register_package_post_type' ] );
             add_action( 'add_meta_boxes', [ $this, 'add_package_meta_boxes' ] );
-            add_action( 'save_post', [ $this, 'save_package_meta_data' ] );
+            add_action( 'save_post_wpd_package', [ $this, 'save_package_meta_data' ] );
             
             // افزودن فیلد به پروفایل کاربری
             add_action( 'show_user_profile', [ $this, 'add_custom_user_profile_fields' ] );
             add_action( 'edit_user_profile', [ $this, 'add_custom_user_profile_fields' ] );
             add_action( 'personal_options_update', [ $this, 'save_custom_user_profile_fields' ] );
             add_action( 'edit_user_profile_update', [ $this, 'save_custom_user_profile_fields' ] );
+
+            // START OF CHANGE: هوک برای ارسال اعلان ثبت‌نام کاربر جدید
+            add_action( 'user_register', [ $this, 'trigger_new_user_notification' ], 10, 1 );
+            // END OF CHANGE
         }
 
         /**
@@ -45,7 +49,7 @@ if ( ! class_exists( 'Directory_User' ) ) {
                     'read_wpd_listing' => true,
                     'delete_wpd_listing' => true,
                     'edit_wpd_listings' => true,
-                    'publish_wpd_listings' => true, // می‌توان این را بر اساس تنظیمات تغییر داد
+                    'publish_wpd_listings' => true,
                     'delete_wpd_listings' => true,
                 ]
             );
@@ -99,26 +103,27 @@ if ( ! class_exists( 'Directory_User' ) ) {
         public function render_package_details_metabox( $post ) {
             wp_nonce_field( 'wpd_save_package_meta', 'wpd_package_nonce' );
             $meta = get_post_meta( $post->ID );
+            $currency = Directory_Main::get_option('general', ['currency' => 'تومان'])['currency'];
             ?>
             <table class="form-table">
                 <tr>
-                    <th><label for="wpd_price"><?php _e( 'قیمت (تومان)', 'wp-directory' ); ?></label></th>
-                    <td><input type="number" id="wpd_price" name="wpd_price" value="<?php echo esc_attr( $meta['_price'][0] ?? '0' ); ?>" class="regular-text">
+                    <th><label for="wpd_price"><?php printf(__( 'قیمت (%s)', 'wp-directory' ), $currency); ?></label></th>
+                    <td><input type="number" id="wpd_price" name="wpd_meta[_price]" value="<?php echo esc_attr( $meta['_price'][0] ?? '0' ); ?>" class="regular-text">
                     <p class="description"><?php _e( 'برای بسته رایگان، 0 وارد کنید.', 'wp-directory' ); ?></p></td>
                 </tr>
                 <tr>
                     <th><label for="wpd_duration"><?php _e( 'مدت اعتبار آگهی (روز)', 'wp-directory' ); ?></label></th>
-                    <td><input type="number" id="wpd_duration" name="wpd_duration" value="<?php echo esc_attr( $meta['_duration'][0] ?? '30' ); ?>" class="regular-text">
+                    <td><input type="number" id="wpd_duration" name="wpd_meta[_duration]" value="<?php echo esc_attr( $meta['_duration'][0] ?? '30' ); ?>" class="regular-text">
                     <p class="description"><?php _e( 'برای اعتبار نامحدود، 0 یا خالی بگذارید.', 'wp-directory' ); ?></p></td>
                 </tr>
                 <tr>
                     <th><label for="wpd_listing_limit"><?php _e( 'تعداد آگهی مجاز', 'wp-directory' ); ?></label></th>
-                    <td><input type="number" id="wpd_listing_limit" name="wpd_listing_limit" value="<?php echo esc_attr( $meta['_listing_limit'][0] ?? '1' ); ?>" class="regular-text">
+                    <td><input type="number" id="wpd_listing_limit" name="wpd_meta[_listing_limit]" value="<?php echo esc_attr( $meta['_listing_limit'][0] ?? '1' ); ?>" class="regular-text">
                     <p class="description"><?php _e( 'برای تعداد نامحدود، 0 یا خالی بگذارید.', 'wp-directory' ); ?></p></td>
                 </tr>
                 <tr>
                     <th><label for="wpd_is_featured"><?php _e( 'آگهی ویژه؟', 'wp-directory' ); ?></label></th>
-                    <td><input type="checkbox" id="wpd_is_featured" name="wpd_is_featured" value="1" <?php checked( $meta['_is_featured'][0] ?? 0, '1' ); ?>>
+                    <td><input type="checkbox" id="wpd_is_featured" name="wpd_meta[_is_featured]" value="1" <?php checked( $meta['_is_featured'][0] ?? 0, '1' ); ?>>
                     <span class="description"><?php _e( 'آیا آگهی‌های این بسته به صورت ویژه نمایش داده شوند؟', 'wp-directory' ); ?></span></td>
                 </tr>
             </table>
@@ -131,20 +136,21 @@ if ( ! class_exists( 'Directory_User' ) ) {
         public function save_package_meta_data( $post_id ) {
             if ( ! isset( $_POST['wpd_package_nonce'] ) || ! wp_verify_nonce( $_POST['wpd_package_nonce'], 'wpd_save_package_meta' ) ) return;
             if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
+            if ( get_post_type($post_id) !== 'wpd_package' ) return;
             if ( ! current_user_can( 'edit_post', $post_id ) ) return;
-            if ( get_post_type( $post_id ) !== 'wpd_package' ) return;
 
-            $fields = [ '_price', '_duration', '_listing_limit', '_is_featured' ];
-            foreach ( $fields as $field ) {
-                $key = str_replace( '_', 'wpd_', $field );
-                if ( isset( $_POST[ $key ] ) ) {
-                    update_post_meta( $post_id, $field, sanitize_text_field( $_POST[ $key ] ) );
-                } else {
-                    // برای چک‌باکس
-                    if($field === '_is_featured') {
-                        update_post_meta( $post_id, $field, '0' );
+            if(isset($_POST['wpd_meta']) && is_array($_POST['wpd_meta'])) {
+                foreach($_POST['wpd_meta'] as $key => $value) {
+                    if ($key === '_is_featured') {
+                        update_post_meta($post_id, $key, '1');
+                    } else {
+                        update_post_meta($post_id, $key, sanitize_text_field($value));
                     }
                 }
+            }
+            // اگر چک‌باکس ارسال نشده بود، یعنی تیک نخورده است
+            if (!isset($_POST['wpd_meta']['_is_featured'])) {
+                update_post_meta($post_id, '_is_featured', '0');
             }
         }
 
@@ -159,7 +165,7 @@ if ( ! class_exists( 'Directory_User' ) ) {
                     <th><label for="phone_number"><?php _e( 'شماره موبایل', 'wp-directory' ); ?></label></th>
                     <td>
                         <input type="text" name="phone_number" id="phone_number" value="<?php echo esc_attr( get_the_author_meta( 'phone_number', $user->ID ) ); ?>" class="regular-text" />
-                        <p class="description"><?php _e( 'برای دریافت اعلان‌های پیامکی استفاده می‌شود.', 'wp-directory' ); ?></p>
+                        <p class="description"><?php _e( 'برای دریافت اعلان‌های پیامکی استفاده می‌شود. (با فرمت 09123456789)', 'wp-directory' ); ?></p>
                     </td>
                 </tr>
             </table>
@@ -176,6 +182,14 @@ if ( ! class_exists( 'Directory_User' ) ) {
             if ( isset( $_POST['phone_number'] ) ) {
                 update_user_meta( $user_id, 'phone_number', sanitize_text_field( $_POST['phone_number'] ) );
             }
+        }
+
+        /**
+         * ارسال اعلان برای کاربر جدید
+         * @param int $user_id
+         */
+        public function trigger_new_user_notification( $user_id ) {
+            Directory_Main::trigger_notification('new_user', ['user_id' => $user_id]);
         }
     }
 }

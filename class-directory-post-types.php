@@ -10,11 +10,16 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
         public function __construct() {
             add_action( 'init', [ $this, 'register_post_types' ] );
+            add_action( 'init', [ $this, 'register_global_taxonomies' ] );
             add_action( 'init', [ $this, 'register_dynamic_taxonomies' ], 10 );
             add_action( 'add_meta_boxes', [ $this, 'add_meta_boxes' ] );
             add_action( 'admin_menu', [ $this, 'remove_default_meta_boxes' ] );
+            
+            // Save hooks
             add_action( 'save_post_wpd_listing', [ $this, 'save_listing_meta_data' ] );
             add_action( 'save_post_wpd_listing_type', [ $this, 'save_listing_type_meta_data' ] );
+            add_action( 'save_post_wpd_upgrade', [ $this, 'save_upgrade_meta_data' ] );
+
             add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_scripts' ] );
             add_action( 'admin_footer', [ $this, 'admin_scripts' ] );
             add_action( 'wp_ajax_wpd_load_admin_fields_and_taxonomies', [ $this, 'ajax_load_admin_fields_and_taxonomies' ] );
@@ -24,6 +29,8 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             add_action( 'manage_wpd_listing_posts_custom_column', [ $this, 'render_listing_columns' ], 10, 2 );
             add_filter( 'manage_wpd_package_posts_columns', [ $this, 'add_package_columns' ] );
             add_action( 'manage_wpd_package_posts_custom_column', [ $this, 'render_package_columns' ], 10, 2 );
+            add_filter( 'manage_wpd_upgrade_posts_columns', [ $this, 'add_upgrade_columns' ] );
+            add_action( 'manage_wpd_upgrade_posts_custom_column', [ $this, 'render_upgrade_columns' ], 10, 2 );
         }
 
         public function register_post_types() {
@@ -74,6 +81,58 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 'supports'      => [ 'title' ],
             ];
             register_post_type( 'wpd_listing_type', $type_args );
+
+            $upgrade_labels = [
+                'name'               => __( 'بسته‌های ارتقا', 'wp-directory' ),
+                'singular_name'      => __( 'بسته ارتقا', 'wp-directory' ),
+                'menu_name'          => __( 'بسته‌های ارتقا', 'wp-directory' ),
+                'add_new_item'       => __( 'افزودن بسته ارتقا جدید', 'wp-directory' ),
+                'edit_item'          => __( 'ویرایش بسته ارتقا', 'wp-directory' ),
+                'all_items'          => __( 'همه بسته‌های ارتقا', 'wp-directory' ),
+            ];
+            $upgrade_args = [
+                'labels'             => $upgrade_labels,
+                'public'             => false,
+                'show_ui'            => true,
+                'show_in_menu'       => false, // Will be added as submenu manually
+                'capability_type'    => 'post',
+                'supports'           => [ 'title' ],
+            ];
+            register_post_type( 'wpd_upgrade', $upgrade_args );
+        }
+
+        public function register_global_taxonomies() {
+            $category_labels = [
+                'name' => __( 'دسته‌بندی‌های آگهی', 'wp-directory' ),
+                'singular_name' => __( 'دسته‌بندی', 'wp-directory' ),
+                'menu_name' => __( 'دسته‌بندی‌ها', 'wp-directory' ),
+            ];
+            register_taxonomy('wpd_listing_category', ['wpd_listing'], [
+                'labels' => $category_labels,
+                'hierarchical' => true,
+                'public' => true,
+                'show_ui' => true,
+                'show_in_menu' => 'wpd-main-menu',
+                'show_admin_column' => true,
+                'query_var' => true,
+                'rewrite' => ['slug' => 'listing-category'],
+            ]);
+
+            $location_labels = [
+                'name' => __( 'مناطق آگهی', 'wp-directory' ),
+                'singular_name' => __( 'منطقه', 'wp-directory' ),
+                'menu_name' => __( 'مناطق', 'wp-directory' ),
+            ];
+            register_taxonomy('wpd_listing_location', ['wpd_listing'], [
+                'labels' => $location_labels,
+                'hierarchical' => true,
+                'public' => true,
+                'show_ui' => true,
+                'show_in_menu' => 'wpd-main-menu',
+                'show_admin_column' => true,
+                'query_var' => true,
+                'rewrite' => ['slug' => 'listing-location'],
+            ]);
         }
 
         public function register_dynamic_taxonomies() {
@@ -99,17 +158,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             'query_var' => true,
                             'rewrite' => ['slug' => $tax['slug']],
                         ];
-                        
-                        // START OF FIX: مشکل از اینجا بود
-                        // با حذف شرط زیر، به وردپرس اجازه می‌دهیم تا خودش متا باکس استاندارد را برای تگ‌ها بسازد
-                        // و دیگر نیازی به ساخت دستی آن نیست. این کار باعث می‌شود اسکریپت‌های لازم به درستی متصل شوند.
-                        /*
-                        if(!$is_hierarchical) {
-                            $args['meta_box_cb'] = false;
-                        }
-                        */
-                        // END OF FIX
-
                         register_taxonomy($tax['slug'], ['wpd_listing'], $args);
                     }
                 }
@@ -118,45 +166,66 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
         public function add_meta_boxes() {
             add_meta_box( 'wpd_listing_type_mb', __( 'اطلاعات اصلی آگهی', 'wp-directory' ), [ $this, 'render_listing_type_metabox' ], 'wpd_listing', 'normal', 'high' );
-            add_meta_box( 'wpd_field_builder_mb', __( 'فیلد ساز', 'wp-directory' ), [ $this, 'render_field_builder_metabox' ], 'wpd_listing_type', 'normal', 'high' );
+            
+            // Meta boxes for Listing Type CPT
+            add_meta_box( 'wpd_listing_type_settings_mb', __( 'تنظیمات اصلی نوع آگهی', 'wp-directory' ), [ $this, 'render_listing_type_settings_metabox' ], 'wpd_listing_type', 'normal', 'high' );
+            add_meta_box( 'wpd_field_builder_mb', __( 'فیلد ساز', 'wp-directory' ), [ $this, 'render_field_builder_metabox' ], 'wpd_listing_type', 'normal', 'default' );
             add_meta_box( 'wpd_taxonomy_builder_mb', __( 'طبقه‌بندی ساز', 'wp-directory' ), [ $this, 'render_taxonomy_builder_metabox' ], 'wpd_listing_type', 'normal', 'default' );
+            add_meta_box( 'wpd_notification_settings_mb', __( 'تنظیمات اعلان‌های این نوع', 'wp-directory' ), [ $this, 'render_notification_settings_metabox' ], 'wpd_listing_type', 'side', 'default' );
 
-            // START OF FIX: این بخش حذف شد
-            // چون وردپرس بعد از اصلاح بالا، خودش متا باکس‌ها را به درستی اضافه می‌کند،
-            // دیگر نیازی به افزودن دستی آن‌ها در اینجا نیست.
-            /*
-            $listing_types = get_posts(['post_type' => 'wpd_listing_type', 'numberposts' => -1, 'post_status' => 'publish']);
-            if(empty($listing_types)) return;
-            foreach($listing_types as $type_post) {
-                $taxonomies = get_post_meta($type_post->ID, '_defined_taxonomies', true);
-                if(empty($taxonomies) || !is_array($taxonomies)) continue;
-                foreach($taxonomies as $tax) {
-                    if(empty($tax['slug'])) continue;
-                    $taxonomy_obj = get_taxonomy($tax['slug']);
-                    if($taxonomy_obj) {
-                        add_meta_box(
-                            $tax['slug'] . 'div',
-                            $taxonomy_obj->labels->name,
-                            $taxonomy_obj->hierarchical ? 'post_categories_meta_box' : 'post_tags_meta_box',
-                            'wpd_listing',
-                            'side',
-                            'default',
-                            ['taxonomy' => $tax['slug']]
-                        );
-                    }
-                }
-            }
-            */
-            // END OF FIX
+            // Add meta box for Upgrade Package CPT
+            add_meta_box( 'wpd_upgrade_details_mb', __( 'جزئیات بسته ارتقا', 'wp-directory' ), [ $this, 'render_upgrade_details_metabox' ], 'wpd_upgrade', 'normal', 'high' );
         }
 
         public function remove_default_meta_boxes() {
             remove_meta_box( 'postimagediv', 'wpd_listing', 'side' );
-            // remove_meta_box( 'tagsdiv-post_tag', 'wpd_listing', 'side' ); // این خط را کامنت یا حذف کنید تا تگ پیش‌فرض وردپرس در صورت نیاز قابل استفاده باشد
             remove_meta_box( 'commentstatusdiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'commentsdiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'slugdiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'authordiv', 'wpd_listing', 'normal' );
+        }
+
+        public function render_listing_type_settings_metabox($post) {
+            wp_nonce_field( 'wpd_save_listing_type_meta', 'wpd_listing_type_nonce' );
+            $currency = Directory_Main::get_option('general', ['currency' => 'تومان'])['currency'];
+            $cost = get_post_meta($post->ID, '_cost', true);
+            ?>
+            <table class="form-table">
+                <tr>
+                    <th><label for="wpd_cost"><?php printf(__( 'هزینه ثبت (%s)', 'wp-directory' ), $currency); ?></label></th>
+                    <td>
+                        <input type="number" id="wpd_cost" name="wpd_meta[_cost]" value="<?php echo esc_attr($cost); ?>" class="small-text">
+                        <p class="description"><?php _e('این مبلغ به هزینه بسته عضویت اضافه می‌شود. برای ثبت رایگان، 0 یا خالی بگذارید.', 'wp-directory'); ?></p>
+                    </td>
+                </tr>
+            </table>
+            <?php
+        }
+
+        public function render_notification_settings_metabox($post) {
+            $settings = get_post_meta($post->ID, '_notification_settings', true);
+            $settings = is_array($settings) ? $settings : [];
+
+            $events = Directory_Main::get_notification_events();
+            ?>
+            <p class="description"><?php _e('ارسال اعلان‌های پیش‌فرض برای این نوع آگهی را مدیریت کنید.', 'wp-directory'); ?></p>
+            <?php foreach ($events as $id => $details): ?>
+                <strong><?php echo esc_html($details['label']); ?></strong>
+                <ul>
+                    <li>
+                        <label>
+                            <input type="checkbox" name="wpd_notifications[<?php echo $id; ?>][email]" value="1" <?php checked(1, $settings[$id]['email'] ?? 1); ?>>
+                            <?php _e('ارسال ایمیل', 'wp-directory'); ?>
+                        </label>
+                    </li>
+                    <li>
+                        <label>
+                            <input type="checkbox" name="wpd_notifications[<?php echo $id; ?>][sms]" value="1" <?php checked(1, $settings[$id]['sms'] ?? 1); ?>>
+                            <?php _e('ارسال پیامک', 'wp-directory'); ?>
+                        </label>
+                    </li>
+                </ul>
+            <?php endforeach;
         }
         
         public function render_taxonomy_builder_metabox($post) {
@@ -201,17 +270,36 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 <input type="text" name="wpd_fields[<?php echo $index; ?>][label]" value="<?php echo esc_attr( $field['label'] ?? '' ); ?>" placeholder="<?php _e( 'عنوان فیلد', 'wp-directory' ); ?>">
                                 <input type="text" name="wpd_fields[<?php echo $index; ?>][key]" value="<?php echo esc_attr( $field['key'] ?? '' ); ?>" placeholder="<?php _e( 'کلید متا (انگلیسی)', 'wp-directory' ); ?>">
                                 <select class="wpd-field-type-selector" name="wpd_fields[<?php echo $index; ?>][type]">
-                                    <option value="text" <?php selected( $field['type'], 'text' ); ?>><?php _e( 'متن', 'wp-directory' ); ?></option>
-                                    <option value="textarea" <?php selected( $field['type'], 'textarea' ); ?>><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
-                                    <option value="number" <?php selected( $field['type'], 'number' ); ?>><?php _e( 'عدد', 'wp-directory' ); ?></option>
-                                    <option value="email" <?php selected( $field['type'], 'email' ); ?>><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
-                                    <option value="url" <?php selected( $field['type'], 'url' ); ?>><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
-                                    <option value="date" <?php selected( $field['type'], 'date' ); ?>><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
-                                    <option value="select" <?php selected( $field['type'], 'select' ); ?>><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
-                                    <option value="checkbox" <?php selected( $field['type'], 'checkbox' ); ?>><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
-                                    <option value="radio" <?php selected( $field['type'], 'radio' ); ?>><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
+                                    <optgroup label="<?php _e('فیلدهای پایه', 'wp-directory'); ?>">
+                                        <option value="text" <?php selected( $field['type'], 'text' ); ?>><?php _e( 'متن', 'wp-directory' ); ?></option>
+                                        <option value="textarea" <?php selected( $field['type'], 'textarea' ); ?>><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
+                                        <option value="number" <?php selected( $field['type'], 'number' ); ?>><?php _e( 'عدد', 'wp-directory' ); ?></option>
+                                        <option value="email" <?php selected( $field['type'], 'email' ); ?>><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
+                                        <option value="url" <?php selected( $field['type'], 'url' ); ?>><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
+                                    </optgroup>
+                                    <optgroup label="<?php _e('فیلدهای اعتبارسنجی', 'wp-directory'); ?>">
+                                        <option value="mobile" <?php selected( $field['type'], 'mobile' ); ?>><?php _e( 'شماره موبایل', 'wp-directory' ); ?></option>
+                                        <option value="phone" <?php selected( $field['type'], 'phone' ); ?>><?php _e( 'شماره تلفن ثابت', 'wp-directory' ); ?></option>
+                                        <option value="postal_code" <?php selected( $field['type'], 'postal_code' ); ?>><?php _e( 'کد پستی', 'wp-directory' ); ?></option>
+                                        <option value="national_id" <?php selected( $field['type'], 'national_id' ); ?>><?php _e( 'کد ملی', 'wp-directory' ); ?></option>
+                                    </optgroup>
+                                    <optgroup label="<?php _e('فیلدهای انتخاب', 'wp-directory'); ?>">
+                                        <option value="select" <?php selected( $field['type'], 'select' ); ?>><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
+                                        <option value="multiselect" <?php selected( $field['type'], 'multiselect' ); ?>><?php _e( 'چند انتخابی', 'wp-directory' ); ?></option>
+                                        <option value="checkbox" <?php selected( $field['type'], 'checkbox' ); ?>><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
+                                        <option value="radio" <?php selected( $field['type'], 'radio' ); ?>><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
+                                    </optgroup>
+                                    <optgroup label="<?php _e('فیلدهای زمان و تاریخ', 'wp-directory'); ?>">
+                                        <option value="date" <?php selected( $field['type'], 'date' ); ?>><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
+                                        <option value="time" <?php selected( $field['type'], 'time' ); ?>><?php _e( 'ساعت', 'wp-directory' ); ?></option>
+                                        <option value="datetime" <?php selected( $field['type'], 'datetime' ); ?>><?php _e( 'تاریخ و ساعت (شمسی)', 'wp-directory' ); ?></option>
+                                    </optgroup>
+                                    <optgroup label="<?php _e('فیلدهای پیشرفته', 'wp-directory'); ?>">
+                                        <option value="gallery" <?php selected( $field['type'], 'gallery' ); ?>><?php _e( 'گالری تصاویر', 'wp-directory' ); ?></option>
+                                        <option value="map" <?php selected( $field['type'], 'map' ); ?>><?php _e( 'نقشه', 'wp-directory' ); ?></option>
+                                    </optgroup>
                                 </select>
-                                <textarea name="wpd_fields[<?php echo $index; ?>][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما)', 'wp-directory' ); ?>" style="<?php echo in_array(($field['type'] ?? ''), ['select', 'checkbox', 'radio']) ? '' : 'display:none;'; ?>"><?php echo esc_textarea( $field['options'] ?? '' ); ?></textarea>
+                                <textarea name="wpd_fields[<?php echo $index; ?>][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما)', 'wp-directory' ); ?>" style="<?php echo in_array(($field['type'] ?? ''), ['select', 'multiselect', 'checkbox', 'radio']) ? '' : 'display:none;'; ?>"><?php echo esc_textarea( $field['options'] ?? '' ); ?></textarea>
                             </div>
                             <a href="#" class="button wpd-remove-field"><?php _e( 'حذف', 'wp-directory' ); ?></a>
                         </div>
@@ -254,11 +342,66 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             </div>
             <?php
         }
+
+        public function render_upgrade_details_metabox($post) {
+            wp_nonce_field( 'wpd_save_upgrade_meta', 'wpd_upgrade_nonce' );
+            $meta = get_post_meta( $post->ID );
+            $currency = Directory_Main::get_option('general', ['currency' => 'تومان'])['currency'];
+            $upgrade_type = $meta['_upgrade_type'][0] ?? '';
+            ?>
+            <table class="form-table">
+                <tr>
+                    <th><label for="wpd_price"><?php printf(__( 'قیمت (%s)', 'wp-directory' ), $currency); ?></label></th>
+                    <td><input type="number" id="wpd_price" name="wpd_meta[_price]" value="<?php echo esc_attr( $meta['_price'][0] ?? '0' ); ?>" class="regular-text"></td>
+                </tr>
+                <tr>
+                    <th><label for="wpd_upgrade_type"><?php _e('نوع ارتقا', 'wp-directory'); ?></label></th>
+                    <td>
+                        <select id="wpd_upgrade_type" name="wpd_meta[_upgrade_type]">
+                            <option value="featured" <?php selected($upgrade_type, 'featured'); ?>><?php _e('ویژه کردن (Featured)', 'wp-directory'); ?></option>
+                            <option value="bump_up" <?php selected($upgrade_type, 'bump_up'); ?>><?php _e('نردبان (Bump Up)', 'wp-directory'); ?></option>
+                            <option value="top_of_category" <?php selected($upgrade_type, 'top_of_category'); ?>><?php _e('پین در بالای دسته (Top of Category)', 'wp-directory'); ?></option>
+                            <option value="urgent" <?php selected($upgrade_type, 'urgent'); ?>><?php _e('برچسب فوری (Urgent)', 'wp-directory'); ?></option>
+                        </select>
+                        <p class="description"><?php _e('عملکرد این بسته ارتقا را مشخص کنید.', 'wp-directory'); ?></p>
+                    </td>
+                </tr>
+                <tr class="wpd-duration-row" style="<?php echo ($upgrade_type === 'bump_up') ? 'display:none;' : ''; ?>">
+                    <th><label for="wpd_duration"><?php _e( 'مدت اعتبار (روز)', 'wp-directory' ); ?></label></th>
+                    <td>
+                        <input type="number" id="wpd_duration" name="wpd_meta[_duration]" value="<?php echo esc_attr( $meta['_duration'][0] ?? '7' ); ?>" class="regular-text">
+                        <p class="description"><?php _e( 'این ارتقا برای چند روز فعال خواهد بود؟ (برای نردبان کاربرد ندارد)', 'wp-directory' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+            <?php
+        }
         
         public function save_listing_type_meta_data( $post_id ) {
             if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
+            if ( get_post_type($post_id) !== 'wpd_listing_type' ) return;
             if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
+            // Save main settings
+            if ( isset( $_POST['wpd_listing_type_nonce'] ) && wp_verify_nonce( $_POST['wpd_listing_type_nonce'], 'wpd_save_listing_type_meta' ) ) {
+                if(isset($_POST['wpd_meta']) && is_array($_POST['wpd_meta'])) {
+                    foreach($_POST['wpd_meta'] as $key => $value) {
+                        update_post_meta($post_id, $key, sanitize_text_field($value));
+                    }
+                }
+            }
+
+            // Save notification settings
+            $notif_settings = [];
+            if(isset($_POST['wpd_notifications']) && is_array($_POST['wpd_notifications'])) {
+                foreach($_POST['wpd_notifications'] as $event => $settings) {
+                    $notif_settings[sanitize_key($event)]['email'] = isset($settings['email']) ? 1 : 0;
+                    $notif_settings[sanitize_key($event)]['sms'] = isset($settings['sms']) ? 1 : 0;
+                }
+            }
+            update_post_meta($post_id, '_notification_settings', $notif_settings);
+
+            // Save field builder
             if ( isset( $_POST['wpd_field_builder_nonce'] ) && wp_verify_nonce( $_POST['wpd_field_builder_nonce'], 'wpd_save_field_builder_meta' ) ) {
                 if ( isset( $_POST['wpd_fields'] ) && is_array($_POST['wpd_fields']) ) {
                     $sanitized_fields = [];
@@ -273,6 +416,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 }
             }
             
+            // Save taxonomy builder
             if ( isset( $_POST['wpd_taxonomy_builder_nonce'] ) && wp_verify_nonce( $_POST['wpd_taxonomy_builder_nonce'], 'wpd_save_taxonomy_builder_meta' ) ) {
                 if ( isset( $_POST['wpd_taxonomies'] ) && is_array($_POST['wpd_taxonomies']) ) {
                     $sanitized_taxs = [];
@@ -297,23 +441,89 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 update_post_meta($post_id, '_wpd_listing_type', intval($_POST['wpd_listing_type']));
             }
 
-            if (isset($_POST['wpd_custom']) && is_array($_POST['wpd_custom'])) {
-                foreach ($_POST['wpd_custom'] as $key => $value) {
-                    if(strpos($key, '_wpd_') === 0) {
-                         if(is_array($value)) {
-                             update_post_meta($post_id, sanitize_key($key), array_map('sanitize_text_field', $value));
-                         } else {
-                             update_post_meta($post_id, sanitize_key($key), sanitize_text_field($value));
-                         }
-                    }
+            if ( !isset($_POST['wpd_custom']) || !is_array($_POST['wpd_custom'])) {
+                return;
+            }
+
+            $listing_type_id = get_post_meta($post_id, '_wpd_listing_type', true);
+            $field_definitions = get_post_meta($listing_type_id, '_wpd_custom_fields', true);
+            $fields_map = [];
+            if (is_array($field_definitions)) {
+                foreach ($field_definitions as $def) {
+                    $fields_map['_wpd_' . $def['key']] = $def['type'];
+                }
+            }
+
+            foreach ($_POST['wpd_custom'] as $key => $value) {
+                if(strpos($key, '_wpd_') !== 0) continue;
+
+                $sanitized_value = null;
+                $field_type = $fields_map[$key] ?? 'text';
+
+                // Sanitize based on field type
+                switch ($field_type) {
+                    case 'email':
+                        $sanitized_value = sanitize_email($value);
+                        break;
+                    case 'number':
+                        $sanitized_value = intval($value);
+                        break;
+                    case 'url':
+                        $sanitized_value = esc_url_raw($value);
+                        break;
+                    case 'textarea':
+                        $sanitized_value = sanitize_textarea_field($value);
+                        break;
+                    case 'checkbox':
+                    case 'multiselect':
+                        $sanitized_value = is_array($value) ? array_map('sanitize_text_field', $value) : sanitize_text_field($value);
+                        break;
+                    case 'gallery':
+                        $sanitized_value = implode(',', array_map('absint', explode(',', $value)));
+                        break;
+                    case 'mobile':
+                    case 'phone':
+                    case 'postal_code':
+                    case 'national_id':
+                        $sanitized_value = sanitize_text_field(preg_replace('/[^0-9]/', '', $value));
+                        break;
+                    case 'map':
+                    case 'text':
+                    case 'select':
+                    case 'radio':
+                    case 'date':
+                    case 'time':
+                    case 'datetime':
+                    default:
+                        $sanitized_value = sanitize_text_field($value);
+                        break;
+                }
+                
+                update_post_meta($post_id, sanitize_key($key), $sanitized_value);
+            }
+        }
+
+        public function save_upgrade_meta_data($post_id) {
+            if ( ! isset( $_POST['wpd_upgrade_nonce'] ) || ! wp_verify_nonce( $_POST['wpd_upgrade_nonce'], 'wpd_save_upgrade_meta' ) ) return;
+            if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
+            if ( get_post_type($post_id) !== 'wpd_upgrade' ) return;
+            if ( ! current_user_can( 'edit_post', $post_id ) ) return;
+
+            if(isset($_POST['wpd_meta']) && is_array($_POST['wpd_meta'])) {
+                foreach($_POST['wpd_meta'] as $key => $value) {
+                    update_post_meta($post_id, $key, sanitize_text_field($value));
                 }
             }
         }
 
         public function enqueue_admin_scripts($hook) {
             global $pagenow, $post_type;
-            if ( ($pagenow == 'post-new.php' || $pagenow == 'post.php') && $post_type == 'wpd_listing' ) {
+            if ( ($pagenow == 'post-new.php' || $pagenow == 'post.php') && in_array($post_type, ['wpd_listing', 'wpd_listing_type']) ) {
                 wp_enqueue_script('tags-box');
+                wp_enqueue_media();
+
+                wp_enqueue_style('leaflet-css', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
+                wp_enqueue_script('leaflet-js', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js', [], '1.7.1', true);
             }
         }
 
@@ -321,12 +531,12 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             global $pagenow, $post_type;
             
             if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_listing_type' ) {
-                ?>
+                 ?>
                 <style>
                     .wpd-field-row { display: flex; align-items: flex-start; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;}
                     .wpd-field-row .handle { cursor: move; color: #888; margin-right: 10px; padding-top: 5px;}
-                    .wpd-field-inputs { display: flex; flex-wrap: wrap; flex-grow: 1; }
-                    .wpd-field-inputs input, .wpd-field-inputs select, .wpd-field-inputs textarea { margin: 0 5px 5px 0; }
+                    .wpd-field-inputs { display: flex; flex-wrap: wrap; flex-grow: 1; gap: 5px; }
+                    .wpd-field-inputs input, .wpd-field-inputs select, .wpd-field-inputs textarea { margin: 0; }
                     .wpd-field-options { width: 100%; height: 60px; }
                 </style>
                 <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
@@ -335,14 +545,14 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         function toggleOptionsField(element) {
                             var fieldType = $(element).val();
                             var optionsTextarea = $(element).siblings('.wpd-field-options');
-                            if (['select', 'checkbox', 'radio'].includes(fieldType)) {
+                            if (['select', 'multiselect', 'checkbox', 'radio'].includes(fieldType)) {
                                 optionsTextarea.show();
                             } else {
                                 optionsTextarea.hide();
                             }
                         }
-                        $('.wpd-field-type-selector').each(function() { toggleOptionsField(this); });
                         $('#wpd-fields-container').on('change', '.wpd-field-type-selector', function() { toggleOptionsField(this); });
+                        $('.wpd-field-type-selector').each(function() { toggleOptionsField(this); });
                         $('#wpd-fields-container, #wpd-taxonomies-container').sortable({ handle: '.handle', opacity: 0.6, cursor: 'move' });
                         
                         $('#wpd-add-field').on('click', function(e) {
@@ -355,15 +565,34 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                         <input type="text" name="wpd_fields[${field_count}][label]" placeholder="<?php _e( 'عنوان فیلد', 'wp-directory' ); ?>">
                                         <input type="text" name="wpd_fields[${field_count}][key]" placeholder="<?php _e( 'کلید متا (انگلیسی)', 'wp-directory' ); ?>">
                                         <select class="wpd-field-type-selector" name="wpd_fields[${field_count}][type]">
-                                            <option value="text"><?php _e( 'متن', 'wp-directory' ); ?></option>
-                                            <option value="textarea"><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
-                                            <option value="number"><?php _e( 'عدد', 'wp-directory' ); ?></option>
-                                            <option value="email"><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
-                                            <option value="url"><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
-                                            <option value="date"><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
-                                            <option value="select"><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
-                                            <option value="checkbox"><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
-                                            <option value="radio"><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
+                                            <optgroup label="<?php _e('فیلدهای پایه', 'wp-directory'); ?>">
+                                                <option value="text"><?php _e( 'متن', 'wp-directory' ); ?></option>
+                                                <option value="textarea"><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
+                                                <option value="number"><?php _e( 'عدد', 'wp-directory' ); ?></option>
+                                                <option value="email"><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
+                                                <option value="url"><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
+                                            </optgroup>
+                                            <optgroup label="<?php _e('فیلدهای اعتبارسنجی', 'wp-directory'); ?>">
+                                                <option value="mobile"><?php _e( 'شماره موبایل', 'wp-directory' ); ?></option>
+                                                <option value="phone"><?php _e( 'شماره تلفن ثابت', 'wp-directory' ); ?></option>
+                                                <option value="postal_code"><?php _e( 'کد پستی', 'wp-directory' ); ?></option>
+                                                <option value="national_id"><?php _e( 'کد ملی', 'wp-directory' ); ?></option>
+                                            </optgroup>
+                                            <optgroup label="<?php _e('فیلدهای انتخاب', 'wp-directory'); ?>">
+                                                <option value="select"><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
+                                                <option value="multiselect"><?php _e( 'چند انتخابی', 'wp-directory' ); ?></option>
+                                                <option value="checkbox"><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
+                                                <option value="radio"><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
+                                            </optgroup>
+                                            <optgroup label="<?php _e('فیلدهای زمان و تاریخ', 'wp-directory'); ?>">
+                                                <option value="date"><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
+                                                <option value="time"><?php _e( 'ساعت', 'wp-directory' ); ?></option>
+                                                <option value="datetime"><?php _e( 'تاریخ و ساعت (شمسی)', 'wp-directory' ); ?></option>
+                                            </optgroup>
+                                            <optgroup label="<?php _e('فیلدهای پیشرفته', 'wp-directory'); ?>">
+                                                <option value="gallery"><?php _e( 'گالری تصاویر', 'wp-directory' ); ?></option>
+                                                <option value="map"><?php _e( 'نقشه', 'wp-directory' ); ?></option>
+                                            </optgroup>
                                         </select>
                                         <textarea name="wpd_fields[${field_count}][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما)', 'wp-directory' ); ?>" style="display:none;"></textarea>
                                     </div>
@@ -400,61 +629,170 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             }
 
             if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_listing' ) {
-                ?>
+                 ?>
+                <style>
+                    .wpd-gallery-field-wrapper .gallery-preview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+                    .wpd-gallery-field-wrapper .gallery-preview .image-container { position: relative; }
+                    .wpd-gallery-field-wrapper .gallery-preview img { width: 100px; height: 100px; object-fit: cover; border: 1px solid #ddd; }
+                    .wpd-gallery-field-wrapper .gallery-preview .remove-image { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; text-align: center; line-height: 20px; }
+                </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
+                        function initAdminFields(container) {
+                            // Gallery Field Logic
+                            container.find('.wpd-upload-gallery-button').on('click', function(e) {
+                                e.preventDefault();
+                                var button = $(this);
+                                var input = button.next('input[type="hidden"]');
+                                var preview = button.siblings('.gallery-preview');
+                                var image_ids = input.val() ? input.val().split(',').filter(Number) : [];
+
+                                var frame = wp.media({
+                                    title: '<?php _e("انتخاب تصاویر گالری", "wp-directory"); ?>',
+                                    button: { text: '<?php _e("استفاده از این تصاویر", "wp-directory"); ?>' },
+                                    multiple: 'add'
+                                });
+
+                                frame.on('open', function() {
+                                    var selection = frame.state().get('selection');
+                                    image_ids.forEach(function(id) {
+                                        var attachment = wp.media.attachment(id);
+                                        attachment.fetch();
+                                        selection.add(attachment ? [attachment] : []);
+                                    });
+                                });
+
+                                frame.on('select', function() {
+                                    var selection = frame.state().get('selection');
+                                    var new_ids = [];
+                                    preview.html('');
+                                    selection.each(function(attachment) {
+                                        new_ids.push(attachment.id);
+                                        preview.append('<div class="image-container"><img src="' + attachment.attributes.sizes.thumbnail.url + '"><span class="remove-image" data-id="' + attachment.id + '">×</span></div>');
+                                    });
+                                    input.val(new_ids.join(','));
+                                });
+
+                                frame.open();
+                            });
+
+                            container.on('click', '.remove-image', function() {
+                                var id_to_remove = $(this).data('id');
+                                var container = $(this).closest('.wpd-gallery-field-wrapper');
+                                var input = container.find('input[type="hidden"]');
+                                var image_ids = input.val().split(',').filter(Number);
+                                var new_ids = image_ids.filter(function(id) {
+                                    return id !== id_to_remove;
+                                });
+                                input.val(new_ids.join(','));
+                                $(this).parent().remove();
+                            });
+
+                            // Map Field Logic (LeafletJS)
+                            container.find('.wpd-map-field-wrapper').each(function() {
+                                var wrapper = $(this);
+                                var input = wrapper.find('input[type="text"]');
+                                var mapContainer = wrapper.find('.map-preview')[0];
+                                var latlng = input.val() ? input.val().split(',') : [32.4279, 53.6880];
+
+                                var map = L.map(mapContainer).setView(latlng, 5);
+                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                }).addTo(map);
+
+                                var marker = L.marker(latlng, { draggable: true }).addTo(map);
+
+                                function updateInput(latlng) {
+                                    input.val(latlng.lat.toFixed(6) + ',' + latlng.lng.toFixed(6));
+                                }
+
+                                marker.on('dragend', function(e) {
+                                    updateInput(e.target.getLatLng());
+                                });
+
+                                map.on('click', function(e) {
+                                    marker.setLatLng(e.latlng);
+                                    updateInput(e.latlng);
+                                });
+                            });
+                        }
+
+                        function setupPage() {
+                            hideAllTaxonomyMetaboxes();
+                            $('#wpd_listing_type_selector').on('change', function() {
+                                var type_id = $(this).val();
+                                var post_id = $('#post_ID').val();
+                                var fields_container = $('#wpd-admin-custom-fields-wrapper');
+                                
+                                hideAllTaxonomyMetaboxes();
+
+                                if(type_id === "") {
+                                    fields_container.html('');
+                                    return;
+                                }
+                                
+                                fields_container.html('<p class="spinner is-active" style="float:none;"></p>');
+
+                                $.ajax({
+                                    url: ajaxurl,
+                                    type: 'POST',
+                                    data: {
+                                        action: 'wpd_load_admin_fields_and_taxonomies',
+                                        type_id: type_id,
+                                        post_id: post_id,
+                                        _ajax_nonce: '<?php echo wp_create_nonce("wpd_admin_fields_nonce"); ?>'
+                                    },
+                                    success: function(response) {
+                                        if(response.success) {
+                                            fields_container.html(response.data.fields);
+                                            showSelectedTaxonomies(response.data.taxonomies);
+                                            initAdminFields(fields_container);
+                                        } else {
+                                            fields_container.html('<p style="color:red;">' + response.data.message + '</p>');
+                                        }
+                                    },
+                                    error: function() {
+                                         fields_container.html('<p style="color:red;">خطا در برقراری ارتباط.</p>');
+                                    }
+                                });
+                            }).trigger('change');
+                        }
+
                         function hideAllTaxonomyMetaboxes() {
-                             $('#side-sortables').find('.postbox[id*="div"]').each(function(){
-                                // متا باکس‌های اصلی وردپرس و متا باکس نوع آگهی را پنهان نکن
+                             $('#side-sortables').find('.postbox').each(function(){
                                 var id = $(this).attr('id');
-                                if(id !== 'submitdiv' && id !== 'wpd_listing_type_mb') {
+                                var keep_ids = ['submitdiv', 'wpd_listing_categorydiv', 'wpd_listing_locationdiv'];
+                                if( ! keep_ids.includes(id) ) {
                                     $(this).hide();
                                 }
                              });
                         }
-                        hideAllTaxonomyMetaboxes();
-
-                        $('#wpd_listing_type_selector').on('change', function() {
-                            var type_id = $(this).val();
-                            var post_id = $('#post_ID').val();
-                            var fields_container = $('#wpd-admin-custom-fields-wrapper');
-                            
-                            hideAllTaxonomyMetaboxes();
-
-                            if(type_id === "") {
-                                fields_container.html('');
-                                return;
+                        
+                        function showSelectedTaxonomies(tax_slugs) {
+                            if(tax_slugs && tax_slugs.length > 0) {
+                                tax_slugs.forEach(function(tax_slug) {
+                                    $('#' + tax_slug + 'div, #tagsdiv-' + tax_slug).show();
+                                });
                             }
-                            
-                            fields_container.html('<p class="spinner is-active" style="float:none;"></p>');
+                        }
+                        
+                        setupPage();
+                    });
+                </script>
+                <?php
+            }
 
-                            $.ajax({
-                                url: ajaxurl,
-                                type: 'POST',
-                                data: {
-                                    action: 'wpd_load_admin_fields_and_taxonomies',
-                                    type_id: type_id,
-                                    post_id: post_id,
-                                    _ajax_nonce: '<?php echo wp_create_nonce("wpd_admin_fields_nonce"); ?>'
-                                },
-                                success: function(response) {
-                                    if(response.success) {
-                                        fields_container.html(response.data.fields);
-                                        if(response.data.taxonomies && response.data.taxonomies.length > 0) {
-                                            response.data.taxonomies.forEach(function(tax_slug) {
-                                                // وردپرس برای طبقه‌بندی‌های سلسله مراتبی از id='[slug]div' و برای غیرسلسله مراتبی از id='tagsdiv-[slug]' استفاده می‌کند
-                                                $('#' + tax_slug + 'div, #tagsdiv-' + tax_slug).show();
-                                            });
-                                        }
-                                    } else {
-                                        fields_container.html('<p style="color:red;">' + response.data.message + '</p>');
-                                    }
-                                },
-                                error: function() {
-                                     fields_container.html('<p style="color:red;">خطا در برقراری ارتباط.</p>');
-                                }
-                            });
-                        }).trigger('change');
+            if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_upgrade' ) {
+                ?>
+                <script type="text/javascript">
+                    jQuery(document).ready(function($) {
+                        $('#wpd_upgrade_type').on('change', function() {
+                            if ($(this).val() === 'bump_up') {
+                                $('.wpd-duration-row').hide();
+                            } else {
+                                $('.wpd-duration-row').show();
+                            }
+                        });
                     });
                 </script>
                 <?php
@@ -509,7 +847,29 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             case 'radio':
                                 foreach($options as $option) echo '<label><input type="radio" name="wpd_custom[' . esc_attr($meta_key) . ']" value="'.esc_attr($option).'" '.checked($value, $option, false).'> '.esc_html($option).'</label><br>';
                                 break;
-                            default: echo '<input type="text" id="' . esc_attr($meta_key) . '" name="wpd_custom[' . esc_attr($meta_key) . ']" value="' . esc_attr($value) . '" class="regular-text">'; break;
+                            case 'gallery':
+                                $image_ids = array_filter(explode(',', $value));
+                                echo '<div class="wpd-gallery-field-wrapper">';
+                                echo '<a href="#" class="button wpd-upload-gallery-button">'.__('مدیریت گالری', 'wp-directory').'</a>';
+                                echo '<input type="hidden" id="'.esc_attr($meta_key).'" name="wpd_custom['.esc_attr($meta_key).']" value="'.esc_attr($value).'">';
+                                echo '<div class="gallery-preview">';
+                                if (!empty($image_ids)) {
+                                    foreach ($image_ids as $id) {
+                                        $image_url = wp_get_attachment_image_url($id, 'thumbnail');
+                                        if ($image_url) {
+                                            echo '<div class="image-container"><img src="' . esc_url($image_url) . '"><span class="remove-image" data-id="' . esc_attr($id) . '">×</span></div>';
+                                        }
+                                    }
+                                }
+                                echo '</div></div>';
+                                break;
+                            case 'map':
+                                echo '<div class="wpd-map-field-wrapper">';
+                                echo '<input type="text" id="'.esc_attr($meta_key).'" name="wpd_custom['.esc_attr($meta_key).']" value="'.esc_attr($value).'" placeholder="32.4279,53.6880">';
+                                echo '<div class="map-preview" style="width:100%; height:250px; background:#eee; margin-top:10px;"></div>';
+                                echo '</div>';
+                                break;
+                            default: echo '<input type="' . esc_attr($field['type']) . '" id="' . esc_attr($meta_key) . '" name="wpd_custom[' . esc_attr($meta_key) . ']" value="' . esc_attr($value) . '" class="regular-text">'; break;
                         }
                         ?>
                     </td>
@@ -556,6 +916,41 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 case 'price': echo number_format(get_post_meta($post_id, '_price', true)); break;
                 case 'duration': echo get_post_meta($post_id, '_duration', true) ?: __('نامحدود', 'wp-directory'); break;
                 case 'limit': echo get_post_meta($post_id, '_listing_limit', true) ?: __('نامحدود', 'wp-directory'); break;
+            }
+        }
+
+        public function add_upgrade_columns($columns) {
+            unset($columns['date']);
+            $columns['price'] = __('قیمت', 'wp-directory') . ' (' . Directory_Main::get_option('general', ['currency' => 'تومان'])['currency'] . ')';
+            $columns['upgrade_type'] = __('نوع ارتقا', 'wp-directory');
+            $columns['duration'] = __('مدت اعتبار (روز)', 'wp-directory');
+            $columns['date'] = __('تاریخ ثبت', 'wp-directory');
+            return $columns;
+        }
+
+        public function render_upgrade_columns($column, $post_id) {
+            switch ($column) {
+                case 'price':
+                    echo number_format(get_post_meta($post_id, '_price', true));
+                    break;
+                case 'upgrade_type':
+                    $type = get_post_meta($post_id, '_upgrade_type', true);
+                    $types = [
+                        'featured' => __('ویژه کردن', 'wp-directory'),
+                        'bump_up' => __('نردبان', 'wp-directory'),
+                        'top_of_category' => __('پین در بالای دسته', 'wp-directory'),
+                        'urgent' => __('برچسب فوری', 'wp-directory'),
+                    ];
+                    echo $types[$type] ?? esc_html($type);
+                    break;
+                case 'duration':
+                    $type = get_post_meta($post_id, '_upgrade_type', true);
+                    if ($type === 'bump_up') {
+                        echo '---';
+                    } else {
+                        echo get_post_meta($post_id, '_duration', true) ?: __('نامحدود', 'wp-directory');
+                    }
+                    break;
             }
         }
     }
