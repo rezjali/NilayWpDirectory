@@ -130,10 +130,9 @@ if ( ! class_exists( 'Directory_Main' ) ) {
          */
         public static function is_shamsi_calendar_enabled() {
             $general_settings = self::get_option('general', ['enable_shamsi_calendar' => 0]);
-            $is_enabled_by_setting = (bool) $general_settings['enable_shamsi_calendar'];
-            $is_parsidate_active = function_exists('parsidate');
-
-            return $is_enabled_by_setting && $is_parsidate_active;
+            // START OF CHANGE: Removed dependency check for any external plugin.
+            return (bool) $general_settings['enable_shamsi_calendar'];
+            // END OF CHANGE
         }
 
         /**
