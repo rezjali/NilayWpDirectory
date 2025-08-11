@@ -92,27 +92,16 @@ if ( ! class_exists( 'Directory_Main' ) ) {
         /**
          * تابع کمکی برای دریافت یک گزینه خاص از تنظیمات افزونه
          *
-         * @param string $option_name نام آپشن
-         * @param mixed $default مقدار پیش‌فرض
-         * @return mixed
+         * @param string $section_name نام بخش (تب) تنظیمات
+         * @param array $defaults مقادیر پیش‌فرض برای آن بخش
+         * @return array
          */
-        public static function get_option( $option_name, $default = false ) {
+        public static function get_option( $section_name, $defaults = [] ) {
             $options = get_option( 'wpd_settings', [] );
-            return isset( $options[ $option_name ] ) ? $options[ $option_name ] : $default;
+            $section_options = isset( $options[ $section_name ] ) ? $options[ $section_name ] : [];
+            return wp_parse_args($section_options, $defaults);
         }
         
-        /**
-         * تابع کمکی برای دریافت یک گزینه از تب ظاهری
-         *
-         * @param string $option_name نام آپشن
-         * @param mixed $default مقدار پیش‌فرض
-         * @return mixed
-         */
-        public static function get_style_option( $option_name, $default = false ) {
-            $options = self::get_option('appearance', []);
-            return isset( $options[ $option_name ] ) && !empty($options[ $option_name ]) ? $options[ $option_name ] : $default;
-        }
-
         /**
          * تابع کمکی برای دریافت اصطلاح سفارشی یا پیش‌فرض
          *
@@ -133,6 +122,18 @@ if ( ! class_exists( 'Directory_Main' ) ) {
             }
             
             return $return_key_on_empty ? esc_html($key) : '';
+        }
+
+        /**
+         * بررسی می‌کند که آیا باید از تقویم شمسی استفاده شود یا خیر
+         * @return bool
+         */
+        public static function is_shamsi_calendar_enabled() {
+            $general_settings = self::get_option('general', ['enable_shamsi_calendar' => 0]);
+            $is_enabled_by_setting = (bool) $general_settings['enable_shamsi_calendar'];
+            $is_parsidate_active = function_exists('parsidate');
+
+            return $is_enabled_by_setting && $is_parsidate_active;
         }
 
         /**
@@ -243,8 +244,8 @@ if ( ! class_exists( 'Directory_Main' ) ) {
             }
             
             // بررسی فعال بودن اعلان
-            $is_email_enabled = ($global_settings["email_enable_{$event}"] ?? 0) && ($type_settings[$event]['email'] ?? 1);
-            $is_sms_enabled = ($global_settings["sms_enable_{$event}"] ?? 0) && ($type_settings[$event]['sms'] ?? 1);
+            $is_email_enabled = !empty($global_settings["email_enable_{$event}"]) && !empty($type_settings[$event]['email']);
+            $is_sms_enabled = !empty($global_settings["sms_enable_{$event}"]) && !empty($type_settings[$event]['sms']);
 
             if (!$is_email_enabled && !$is_sms_enabled) {
                 return;
@@ -350,7 +351,7 @@ if ( ! class_exists( 'Directory_Main' ) ) {
                 ]);
             }
 
-            // START OF CHANGE: 3. یافتن و منقضی کردن ارتقاهای آگهی
+            // 3. یافتن و منقضی کردن ارتقاهای آگهی
             $upgrade_meta_keys = [
                 '_wpd_is_featured' => '_wpd_featured_expires_on',
                 '_wpd_is_urgent' => '_wpd_urgent_expires_on',
@@ -383,7 +384,6 @@ if ( ! class_exists( 'Directory_Main' ) ) {
                     delete_post_meta($listing->ID, $expiry_key);
                 }
             }
-            // END OF CHANGE
         }
     }
 }

@@ -91,9 +91,24 @@ class WPD_Transactions_List_Table extends WP_List_Table {
                 $user = get_userdata( $item[ $column_name ] );
                 return $user ? $user->display_name : __( 'کاربر حذف شده', 'wp-directory' );
             case 'status':
-                $status_label = __(ucfirst($item[$column_name]), 'wp-directory');
-                $status_class = sanitize_key($item[$column_name]);
-                return '<span class="wpd-status-' . $status_class . '">' . $status_label . '</span>';
+                $status = $item[$column_name];
+                $status_label = '';
+                switch ($status) {
+                    case 'completed':
+                        $status_label = __('موفق', 'wp-directory');
+                        break;
+                    case 'pending':
+                        $status_label = __('در انتظار', 'wp-directory');
+                        break;
+                    case 'failed':
+                        $status_label = __('ناموفق', 'wp-directory');
+                        break;
+                    default:
+                        $status_label = ucfirst($status);
+                        break;
+                }
+                $status_class = sanitize_key($status);
+                return '<span class="wpd-status-' . $status_class . '">' . esc_html($status_label) . '</span>';
             case 'created_at': return date_i18n('Y/m/d H:i', strtotime($item[ $column_name ]));
             default: return esc_html( $item[ $column_name ] );
         }
@@ -262,13 +277,19 @@ class Directory_Admin {
         foreach ($input as $section => $values) {
             if (is_array($values)) {
                 foreach ($values as $key => $value) {
-                    if (strpos($key, 'email_body_') === 0) {
-                        $new_input[$section][$key] = wp_kses_post($value);
-                    } elseif (is_array($value)) {
-                        $new_input[$section][$key] = array_map('sanitize_text_field', $value);
+                    $sanitized_value = null;
+                    // Specific sanitization rules
+                    if ( $section === 'appearance' && strpos($key, '_color') !== false ) {
+                        $sanitized_value = sanitize_hex_color($value);
+                    } elseif ( strpos($key, 'email_body_') === 0 ) {
+                        $sanitized_value = wp_kses_post($value);
+                    } elseif ( is_array($value) ) {
+                        $sanitized_value = array_map('sanitize_text_field', $value);
                     } else {
-                        $new_input[$section][$key] = sanitize_text_field($value);
+                        // Default sanitization
+                        $sanitized_value = sanitize_text_field($value);
                     }
+                    $new_input[$section][$key] = $sanitized_value;
                 }
             }
         }
@@ -278,6 +299,11 @@ class Directory_Admin {
     private function add_general_fields($section_id){
         add_settings_field('general_pages', 'برگه‌های اصلی', [$this, 'render_page_dropdown_fields'], 'wpd_settings_general', $section_id);
         add_settings_field('general_packages_system', 'سیستم بسته‌های عضویت', [$this, 'render_checkbox_element'], 'wpd_settings_general', $section_id, ['section' => 'general', 'id' => 'enable_packages', 'desc' => 'در صورت غیرفعال بودن، مرحله انتخاب بسته حذف شده و از مدل پرداخت به ازای هر آگهی استفاده می‌شود.']);
+        add_settings_field('general_shamsi_calendar', __('فعال‌سازی تقویم شمسی', 'wp-directory'), [$this, 'render_checkbox_element'], 'wpd_settings_general', $section_id, [
+            'section' => 'general', 
+            'id' => 'enable_shamsi_calendar', 
+            'desc' => __('برای عملکرد صحیح، نصب و فعال بودن افزونه <a href="https://wordpress.org/plugins/wp-parsidate/" target="_blank">Parsi Date</a> الزامی است.', 'wp-directory')
+        ]);
         add_settings_field('general_currency', 'واحد پولی', [$this, 'render_text_input_element'], 'wpd_settings_general', $section_id, ['section' => 'general', 'id' => 'currency', 'default' => 'تومان']);
         add_settings_field('general_approval_method', 'روش تایید آگهی', [$this, 'render_select_element'], 'wpd_settings_general', $section_id, [
             'section' => 'general', 
@@ -426,25 +452,30 @@ class Directory_Admin {
     }
     
     public function render_page_dropdown_fields($args) {
+        $options = Directory_Main::get_option('general', []);
         $pages = ['submit_page' => 'صفحه ثبت آگهی', 'dashboard_page' => 'صفحه داشبورد کاربری', 'archive_page' => 'صفحه آرشیو آگهی‌ها'];
-        echo '<tr><th>' . esc_html($args['label']) . '</th><td>';
+        
         foreach ($pages as $id => $label) {
-            echo '<p><strong>' . esc_html($label) . '</strong></p>';
-            $this->render_page_dropdown_element(['section' => 'general', 'id' => $id]);
+            $value = $options[$id] ?? '';
+            echo '<tr>';
+            echo '<th><label for="wpd_settings_general_'.esc_attr($id).'">'.esc_html($label).'</label></th>';
+            echo '<td>';
+            wp_dropdown_pages([
+                'name' => 'wpd_settings[general]['.$id.']', 
+                'id' => 'wpd_settings_general_'.esc_attr($id),
+                'selected' => $value, 
+                'show_option_none' => '— ' . __('انتخاب کنید', 'wp-directory') . ' —'
+            ]);
+            echo '</td>';
+            echo '</tr>';
         }
-        echo '</td></tr>';
-    }
-
-    public function render_page_dropdown_element($args){
-        $options = Directory_Main::get_option($args['section'], []);
-        $value = $options[$args['id']] ?? '';
-        wp_dropdown_pages(['name' => 'wpd_settings['.$args['section'].']['.$args['id'].']', 'selected' => $value, 'show_option_none' => '— انتخاب کنید —']);
     }
 
     public function render_checkbox_element($args){
         $options = Directory_Main::get_option($args['section'], []);
         $value = $options[$args['id']] ?? '0';
-        echo '<label><input type="checkbox" name="wpd_settings['.$args['section'].']['.$args['id'].']" value="1" '.checked(1, $value, false).' /> '.($args['desc'] ?? '').'</label>';
+        $desc = $args['desc'] ?? '';
+        echo '<label><input type="checkbox" name="wpd_settings['.$args['section'].']['.$args['id'].']" value="1" '.checked(1, $value, false).' /> '.wp_kses_post($desc).'</label>';
     }
 
     public function render_text_input_element($args){
@@ -452,7 +483,7 @@ class Directory_Admin {
         $value = $options[$args['id']] ?? ($args['default'] ?? '');
         $placeholder = $args['placeholder'] ?? $args['default'] ?? '';
         echo '<input type="text" id="wpd_settings_'.esc_attr($args['section']).'_'.esc_attr($args['id']).'" name="wpd_settings['.$args['section'].']['.$args['id'].']" value="'.esc_attr($value).'" class="regular-text" placeholder="'.esc_attr($placeholder).'" />';
-        if(isset($args['desc'])) echo '<p class="description">'.$args['desc'].'</p>';
+        if(isset($args['desc'])) echo '<p class="description">'.wp_kses_post($args['desc']).'</p>';
     }
     
     public function render_wp_editor_element($args) {
@@ -460,7 +491,7 @@ class Directory_Admin {
         $content = $options[$args['id']] ?? '';
         $editor_id = 'wpd_editor_'.$args['section'].'_'.$args['id'];
         wp_editor(wp_unslash($content), $editor_id, ['textarea_name' => 'wpd_settings['.$args['section'].']['.$args['id'].']', 'media_buttons' => false, 'textarea_rows' => 7]);
-        if(isset($args['desc'])) echo '<p class="description">'.$args['desc'].'</p>';
+        if(isset($args['desc'])) echo '<p class="description">'.wp_kses_post($args['desc']).'</p>';
     }
 
     public function render_color_picker_element($args){
@@ -476,10 +507,10 @@ class Directory_Admin {
          
          echo '<select id="wpd_settings_'.esc_attr($args['section']).'_'.esc_attr($args['id']).'" name="wpd_settings['.$args['section'].']['.$args['id'].']">';
          foreach($select_options as $opt_key => $opt_name){
-             echo '<option value="'.$opt_key.'" '.selected($value, $opt_key, false).'>'.$opt_name.'</option>';
+             echo '<option value="'.esc_attr($opt_key).'" '.selected($value, $opt_key, false).'>'.esc_html($opt_name).'</option>';
          }
          echo '</select>';
-         if(isset($args['desc'])) echo '<p class="description">'.$args['desc'].'</p>';
+         if(isset($args['desc'])) echo '<p class="description">'.wp_kses_post($args['desc']).'</p>';
     }
 
     public function render_switch_element($args) {

@@ -8,12 +8,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
     class Directory_Post_Types {
 
-        private $is_parsidate_active;
-
         public function __construct() {
-            // Check for Parsi Date plugin once
-            $this->is_parsidate_active = function_exists('parsidate');
-
             add_action( 'init', [ $this, 'register_post_types' ] );
             add_action( 'init', [ $this, 'register_global_taxonomies' ] );
             add_action( 'init', [ $this, 'register_dynamic_taxonomies' ], 10 );
@@ -193,7 +188,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             ?>
             <table class="form-table">
                 <tr>
-                    <th><label for="wpd_cost"><?php printf(__( 'هزینه ثبت (%s)', 'wp-directory' ), $currency); ?></label></th>
+                    <th><label for="wpd_cost"><?php printf(__( 'هزینه ثبت (%s)', 'wp-directory' ), esc_html($currency)); ?></label></th>
                     <td>
                         <input type="number" id="wpd_cost" name="wpd_meta[_cost]" value="<?php echo esc_attr($cost); ?>" class="small-text">
                         <p class="description"><?php _e('این مبلغ به هزینه بسته عضویت اضافه می‌شود. برای ثبت رایگان، 0 یا خالی بگذارید.', 'wp-directory'); ?></p>
@@ -215,13 +210,13 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 <ul>
                     <li>
                         <label>
-                            <input type="checkbox" name="wpd_notifications[<?php echo $id; ?>][email]" value="1" <?php checked(1, $settings[$id]['email'] ?? 1); ?>>
+                            <input type="checkbox" name="wpd_notifications[<?php echo esc_attr($id); ?>][email]" value="1" <?php checked(1, $settings[$id]['email'] ?? 1); ?>>
                             <?php _e('ارسال ایمیل', 'wp-directory'); ?>
                         </label>
                     </li>
                     <li>
                         <label>
-                            <input type="checkbox" name="wpd_notifications[<?php echo $id; ?>][sms]" value="1" <?php checked(1, $settings[$id]['sms'] ?? 1); ?>>
+                            <input type="checkbox" name="wpd_notifications[<?php echo esc_attr($id); ?>][sms]" value="1" <?php checked(1, $settings[$id]['sms'] ?? 1); ?>>
                             <?php _e('ارسال پیامک', 'wp-directory'); ?>
                         </label>
                     </li>
@@ -241,9 +236,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     <div class="wpd-field-row">
                         <span class="dashicons dashicons-move handle"></span>
                         <div class="wpd-field-inputs">
-                            <input type="text" name="wpd_taxonomies[<?php echo $index; ?>][name]" value="<?php echo esc_attr( $tax['name'] ?? '' ); ?>" placeholder="<?php _e( 'نام طبقه‌بندی (فارسی)', 'wp-directory' ); ?>">
-                            <input type="text" name="wpd_taxonomies[<?php echo $index; ?>][slug]" value="<?php echo esc_attr( $tax['slug'] ?? '' ); ?>" placeholder="<?php _e( 'نامک (انگلیسی)', 'wp-directory' ); ?>">
-                            <select name="wpd_taxonomies[<?php echo $index; ?>][hierarchical]">
+                            <input type="text" name="wpd_taxonomies[<?php echo esc_attr($index); ?>][name]" value="<?php echo esc_attr( $tax['name'] ?? '' ); ?>" placeholder="<?php _e( 'نام طبقه‌بندی (فارسی)', 'wp-directory' ); ?>">
+                            <input type="text" name="wpd_taxonomies[<?php echo esc_attr($index); ?>][slug]" value="<?php echo esc_attr( $tax['slug'] ?? '' ); ?>" placeholder="<?php _e( 'نامک (انگلیسی)', 'wp-directory' ); ?>">
+                            <select name="wpd_taxonomies[<?php echo esc_attr($index); ?>][hierarchical]">
                                 <option value="1" <?php selected( $tax['hierarchical'] ?? '1', '1' ); ?>><?php _e('سلسله مراتبی', 'wp-directory'); ?></option>
                                 <option value="0" <?php selected( $tax['hierarchical'] ?? '1', '0' ); ?>><?php _e('غیر سلسله مراتبی (تگ)', 'wp-directory'); ?></option>
                             </select>
@@ -311,9 +306,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 <option value="radio" <?php selected( $type, 'radio' ); ?>><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
                             </optgroup>
                             <optgroup label="<?php _e('فیلدهای زمان و تاریخ', 'wp-directory'); ?>">
-                                <option value="date" <?php selected( $type, 'date' ); ?>><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
+                                <option value="date" <?php selected( $type, 'date' ); ?>><?php _e( 'تاریخ', 'wp-directory' ); ?></option>
                                 <option value="time" <?php selected( $type, 'time' ); ?>><?php _e( 'ساعت', 'wp-directory' ); ?></option>
-                                <option value="datetime" <?php selected( $type, 'datetime' ); ?>><?php _e( 'تاریخ و ساعت (شمسی)', 'wp-directory' ); ?></option>
+                                <option value="datetime" <?php selected( $type, 'datetime' ); ?>><?php _e( 'تاریخ و ساعت', 'wp-directory' ); ?></option>
                             </optgroup>
                             <optgroup label="<?php _e('فیلدهای ساختاری', 'wp-directory'); ?>">
                                 <option value="section_title" <?php selected( $type, 'section_title' ); ?>><?php _e('عنوان بخش (Heading)', 'wp-directory'); ?></option>
@@ -358,7 +353,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             <select name="wpd_listing_type" id="wpd_listing_type_selector" style="width:100%;">
                                 <option value=""><?php _e('-- انتخاب کنید --', 'wp-directory'); ?></option>
                                 <?php foreach($listing_types as $type): ?>
-                                    <option value="<?php echo $type->ID; ?>" <?php selected($selected_type, $type->ID); ?>><?php echo esc_html($type->post_title); ?></option>
+                                    <option value="<?php echo esc_attr($type->ID); ?>" <?php selected($selected_type, $type->ID); ?>><?php echo esc_html($type->post_title); ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <p class="description"><?php _e('با انتخاب نوع آگهی، فیلدهای سفارشی و طبقه‌بندی‌های مربوطه در ستون کناری نمایش داده می‌شوند.', 'wp-directory'); ?></p>
@@ -385,7 +380,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             ?>
             <table class="form-table">
                 <tr>
-                    <th><label for="wpd_price"><?php printf(__( 'قیمت (%s)', 'wp-directory' ), $currency); ?></label></th>
+                    <th><label for="wpd_price"><?php printf(__( 'قیمت (%s)', 'wp-directory' ), esc_html($currency)); ?></label></th>
                     <td><input type="number" id="wpd_price" name="wpd_meta[_price]" value="<?php echo esc_attr( $meta['_price'][0] ?? '0' ); ?>" class="regular-text"></td>
                 </tr>
                 <tr>
@@ -504,7 +499,8 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
         private function process_and_save_fields($post_id, $field_definitions, $posted_data, $meta_prefix = '_wpd_') {
             foreach ($field_definitions as $field_def) {
-                $meta_key = $meta_prefix . sanitize_key($field_def['key']);
+                $field_key = $field_def['key'];
+                $meta_key = $meta_prefix . sanitize_key($field_key);
                 $value_exists = isset($posted_data[$field_def['key']]);
                 $posted_value = $value_exists ? $posted_data[$field_def['key']] : null;
 
@@ -530,7 +526,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 if ($field_def['type'] === 'repeater') {
                     $repeater_data = [];
                     if (is_array($posted_value) && !empty($field_def['sub_fields'])) {
-                        foreach ($posted_value as $row_data) {
+                        foreach ($posted_value as $index => $row_data) {
+                            if ($index === '__INDEX__') {
+                                continue;
+                            }
                             $sanitized_row = [];
                             foreach ($field_def['sub_fields'] as $sub_field_def) {
                                 $sub_field_key = $sub_field_def['key'];
@@ -602,14 +601,16 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 wp_enqueue_script('tags-box');
                 wp_enqueue_media();
                 wp_enqueue_script('jquery-ui-sortable');
-                
-                // **FIX:** Enqueue all necessary jQuery UI core components for datepicker
-                wp_enqueue_script('jquery-ui-core');
                 wp_enqueue_script('jquery-ui-datepicker');
                 wp_enqueue_style('wp-jquery-ui-dialog');
+                wp_enqueue_style( 'jquery-ui-style', 'https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css', true);
 
                 wp_enqueue_style('leaflet-css', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
                 wp_enqueue_script('leaflet-js', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js', [], '1.7.1', true);
+
+                if ( Directory_Main::is_shamsi_calendar_enabled() && function_exists('wpp_enqueue_scripts') ) {
+                    wpp_enqueue_scripts();
+                }
             }
         }
 
@@ -715,107 +716,43 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     .wpd-repeater-row { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; background: #fdfdfd; }
                     .wpd-datepicker-wrapper { display: flex; align-items: center; }
                     .wpd-datepicker-icon { cursor: pointer; vertical-align: middle; margin-right: 5px; }
-                    .ui-datepicker { z-index: 9999 !important; font-family: sans-serif; }
-                    .ui-datepicker-rtl { direction: rtl; }
-                    .ui-datepicker-rtl .ui-datepicker-prev { float: right; }
-                    .ui-datepicker-rtl .ui-datepicker-next { float: left; }
+                    .ui-datepicker { z-index: 9999 !important; }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
 
-                        function initJalaliDatepicker(container) {
-                            if (typeof $.fn.datepicker === 'undefined') {
-                                console.error('WPD Error: jQuery UI Datepicker is not loaded.');
-                                return;
-                            }
-
-                            var jalaliMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-                            var jalaliDays = ['ی', 'د', 'س', 'چ', 'پ', 'ج', 'ش'];
-
-                            function toJalali(gy, gm, gd) {
-                                var g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-                                var jy = (gy <= 1600) ? 0 : 979;
-                                gy -= (gy <= 1600) ? 621 : 1600;
-                                var gy2 = (gm > 2) ? (gy + 1) : gy;
-                                var days = 365 * gy + parseInt((gy2 + 3) / 4) - parseInt((gy2 + 99) / 100) + parseInt((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
-                                jy += 33 * parseInt(days / 12053);
-                                days %= 12053;
-                                jy += 4 * parseInt(days / 1461);
-                                days %= 1461;
-                                if (days > 365) { days = (days - 1) % 365; jy += parseInt((days) / 365); }
-                                var jm = (days < 186) ? 1 + parseInt(days / 31) : 7 + parseInt((days - 186) / 30);
-                                var jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
-                                return [jy, jm, jd];
-                            }
-
-                            function toGregorian(jy, jm, jd) {
-                                var gy = (jy <= 979) ? 621 : 1600;
-                                jy -= (jy <= 979) ? 0 : 979;
-                                var days = 365 * jy + parseInt(jy / 33) * 8 + parseInt(((jy % 33) + 3) / 4) + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
-                                gy += 400 * parseInt(days / 146097);
-                                days %= 146097;
-                                if (days > 36524) {
-                                    gy += 100 * parseInt(--days / 36524);
-                                    days %= 36524;
-                                    if (days >= 365) days++;
+                        function initGregorianDatepicker(container) {
+                            container.find('.wpd-gregorian-datepicker').each(function() {
+                                if (!$(this).hasClass('hasDatepicker')) {
+                                    $(this).datepicker({
+                                        dateFormat: 'yy-mm-dd'
+                                    });
                                 }
-                                gy += 4 * parseInt(days / 1461);
-                                days %= 1461;
-                                gy += parseInt((days - 1) / 365);
-                                if (days > 365) days = (days - 1) % 365;
-                                var gd = days + 1;
-                                var sal_a = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-                                var gm;
-                                for (gm = 0; gm < 13 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
-                                return [gy, gm, gd];
-                            }
+                            });
+                        }
 
-                            container.find('.wpd-admin-datepicker').each(function() {
-                                var $input = $(this);
-                                if ($input.data('jalali-init')) return;
-                                
-                                var wrapper = $input.closest('.wpd-datepicker-wrapper');
-                                var altField = wrapper.find('input[type="hidden"]');
-
-                                $input.datepicker({
-                                    dateFormat: 'yy/mm/dd',
-                                    isRTL: true,
-                                    monthNames: jalaliMonths,
-                                    dayNamesMin: jalaliDays,
-                                    changeMonth: true,
-                                    changeYear: true,
-                                    beforeShow: function(input, inst) {
-                                        var gregorianDate = altField.val();
-                                        if (gregorianDate && gregorianDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                                            var parts = gregorianDate.split('-');
-                                            var jalali = toJalali(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
-                                            $input.val(jalali[0] + '/' + (jalali[1] < 10 ? '0' : '') + jalali[1] + '/' + (jalali[2] < 10 ? '0' : '') + jalali[2]);
-                                        } else {
-                                            $input.val('');
-                                        }
-                                    },
-                                    onSelect: function(dateText, inst) {
-                                        var jalaliParts = dateText.split('/');
-                                        var gregorian = toGregorian(parseInt(jalaliParts[0]), parseInt(jalaliParts[1]), parseInt(jalaliParts[2]));
-                                        var gregorianStr = gregorian[0] + '-' + (gregorian[1] < 10 ? '0' : '') + gregorian[1] + '-' + (gregorian[2] < 10 ? '0' : '') + gregorian[2];
-                                        altField.val(gregorianStr).trigger('change');
+                        function initShamsiDatepicker(container) {
+                            if (typeof $.fn.persianDatepicker === 'function') {
+                                container.find('.persian-datepicker').each(function() {
+                                    var $this = $(this);
+                                    if (!$this.data('has-pd')) {
+                                        var altField = $this.next('.persian-datepicker-alt');
+                                        $this.persianDatepicker({
+                                            format: 'YYYY/MM/DD',
+                                            autoClose: true,
+                                            altField: altField,
+                                            altFormat: 'YYYY-MM-DD'
+                                        });
+                                        $this.data('has-pd', true);
                                     }
                                 });
+                            }
+                        }
 
-                                if (altField.val()) {
-                                    var initialDate = new Date(altField.val());
-                                    if (!isNaN(initialDate)) {
-                                        $input.datepicker('setDate', initialDate);
-                                    }
-                                }
-                                
-                                $input.data('jalali-init', true);
-                            });
-
-                            container.off('click', '.wpd-datepicker-icon').on('click', '.wpd-datepicker-icon', function(e) {
-                                e.preventDefault();
-                                $(this).siblings('input.wpd-admin-datepicker').datepicker('show');
-                            });
+                        function initAllFields(container) {
+                            initGregorianDatepicker(container);
+                            initShamsiDatepicker(container);
+                            initOtherAdvancedFields(container);
                         }
 
                         function initOtherAdvancedFields(container) {
@@ -917,8 +854,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 success: function(response) {
                                     if(response.success) {
                                         fields_container.html(response.data.fields);
-                                        initJalaliDatepicker(fields_container);
-                                        initOtherAdvancedFields(fields_container);
+                                        initAllFields(fields_container);
                                     } else {
                                         fields_container.html('<p style="color:red;">' + response.data.message + '</p>');
                                     }
@@ -936,8 +872,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             var newIndex = container.children().length;
                             var newRowHtml = template.html().replace(/__INDEX__/g, newIndex);
                             var newRow = $(newRowHtml).appendTo(container);
-                            initJalaliDatepicker(newRow);
-                            initOtherAdvancedFields(newRow);
+                            initAllFields(newRow);
                         });
 
                         $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-remove-row', function(e) {
@@ -947,9 +882,8 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             }
                         });
 
-                        // Initial call
-                        initJalaliDatepicker($('#wpd-admin-custom-fields-wrapper'));
-                        initOtherAdvancedFields($('#wpd-admin-custom-fields-wrapper'));
+                        // Initial call for fields already on the page
+                        initAllFields($('#wpd-admin-custom-fields-wrapper'));
                     });
                 </script>
                 <?php
@@ -994,9 +928,12 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
         private function render_admin_fields_recursive($fields, $post_id, $row_data = [], $name_prefix = 'wpd_custom', $meta_prefix = '_wpd_') {
             foreach ($fields as $field) {
                 $field_key = $field['key'];
-                $meta_key = $meta_prefix . sanitize_key($field_key);
                 $field_name = $name_prefix . '[' . $field_key . ']';
-                $value = ($meta_prefix === '') ? ($row_data[$field_key] ?? '') : get_post_meta($post_id, $meta_key, true);
+                
+                $field_id = preg_replace('/\]\[|\[|\]/', '_', $field_name);
+                $field_id = rtrim($field_id, '_');
+
+                $value = ($meta_prefix === '') ? ($row_data[$field_key] ?? '') : get_post_meta($post_id, $meta_prefix . sanitize_key($field_key), true);
 
                 if ($field['type'] === 'section_title') {
                     echo '<tr><td colspan="2"><h3 class="wpd-section-title">' . esc_html($field['label']) . '</h3></td></tr>';
@@ -1009,20 +946,20 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
                 ?>
                 <tr>
-                    <th><label for="<?php echo esc_attr($meta_key); ?>"><?php echo esc_html($field['label']); ?></label></th>
+                    <th><label for="<?php echo esc_attr($field_id); ?>"><?php echo esc_html($field['label']); ?></label></th>
                     <td>
                         <?php
                         $options = !empty($field['options']) ? array_map('trim', explode(',', $field['options'])) : [];
                         switch($field['type']) {
-                            case 'textarea': echo '<textarea id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" class="large-text">' . esc_textarea($value) . '</textarea>'; break;
+                            case 'textarea': echo '<textarea id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" class="large-text">' . esc_textarea($value) . '</textarea>'; break;
                             case 'select':
-                                echo '<select id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '">';
+                                echo '<select id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '">';
                                 echo '<option value="">-- انتخاب کنید --</option>';
                                 foreach($options as $option) echo '<option value="'.esc_attr($option).'" '.selected($value, $option, false).'>'.esc_html($option).'</option>';
                                 echo '</select>';
                                 break;
                             case 'multiselect':
-                                echo '<select id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '[]" multiple class="large-text">';
+                                echo '<select id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '[]" multiple class="large-text">';
                                 $saved_values = is_array($value) ? $value : [];
                                 foreach($options as $option) echo '<option value="'.esc_attr($option).'" '.(in_array($option, $saved_values) ? 'selected' : '').'>'.esc_html($option).'</option>';
                                 echo '</select>';
@@ -1035,38 +972,40 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 foreach($options as $option) echo '<label><input type="radio" name="' . esc_attr($field_name) . '" value="'.esc_attr($option).'" '.checked($value, $option, false).'> '.esc_html($option).'</label><br>';
                                 break;
                             case 'date': 
-                                $display_value = '';
-                                if ($this->is_parsidate_active && !empty($value)) {
-                                    $display_value = parsidate('Y/m/d', $value, 'gregorian');
+                                $is_shamsi = Directory_Main::is_shamsi_calendar_enabled();
+                                if ($is_shamsi) {
+                                    $display_value = !empty($value) && function_exists('parsidate') ? parsidate('Y/m/d', $value, 'gregorian') : '';
+                                    echo '<input type="text" id="' . esc_attr($field_id) . '_display" value="' . esc_attr($display_value) . '" class="regular-text persian-datepicker" autocomplete="off" readonly="readonly" style="direction: ltr; text-align: right;">';
+                                    echo '<input type="hidden" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="persian-datepicker-alt">';
+                                } else {
+                                    echo '<input type="text" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text wpd-gregorian-datepicker" autocomplete="off">';
                                 }
-                                $class = $this->is_parsidate_active ? 'persian-datepicker' : 'wpd-datepicker';
-                                echo '<div class="wpd-datepicker-wrapper">';
-                                echo '<input type="text" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($display_value) . '" class="regular-text ' . $class . '" autocomplete="off">';
-                                echo '<span class="dashicons dashicons-calendar-alt wpd-datepicker-icon"></span>';
-                                echo '</div>';
                                 break;
                             case 'time':
-                                echo '<input type="time" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text" style="direction: ltr;">';
+                                echo '<input type="time" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text" style="direction: ltr;">';
                                 break;
                             case 'datetime':
-                                $date_val = !empty($value) ? date('Y-m-d H:i:s', strtotime($value)) : '';
-                                $display_value = '';
-                                if ($this->is_parsidate_active && !empty($date_val)) {
-                                    $display_value = parsidate('Y/m/d', $date_val, 'gregorian');
-                                }
-                                $class = $this->is_parsidate_active ? 'persian-datepicker' : 'wpd-datepicker';
+                                $is_shamsi = Directory_Main::is_shamsi_calendar_enabled();
+                                $date_val = !empty($value) ? date('Y-m-d', strtotime($value)) : '';
                                 $time_val = !empty($value) ? date('H:i', strtotime($value)) : '';
-
-                                echo '<div class="wpd-datepicker-wrapper" style="display:inline-block; margin-left: 10px;">';
-                                echo '<input type="text" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '[date]" value="' . esc_attr($display_value) . '" class="regular-text ' . $class . '" autocomplete="off" style="width: 150px;">';
-                                echo '<span class="dashicons dashicons-calendar-alt wpd-datepicker-icon"></span>';
-                                echo '</div>';
-                                echo '<input type="time" id="' . esc_attr($meta_key) . '_time" name="' . esc_attr($field_name) . '[time]" value="' . esc_attr($time_val) . '" class="regular-text" style="direction: ltr;">';
+                                
+                                if ($is_shamsi) {
+                                    $display_date = !empty($date_val) && function_exists('parsidate') ? parsidate('Y/m/d', $date_val, 'gregorian') : '';
+                                    echo '<div class="wpd-datepicker-wrapper" style="display:inline-block; margin-left: 10px;">';
+                                    echo '<input type="text" id="' . esc_attr($field_id) . '_date_display" value="' . esc_attr($display_date) . '" class="regular-text persian-datepicker" autocomplete="off" readonly="readonly" style="width: 150px; direction: ltr; text-align: right;">';
+                                    echo '<input type="hidden" id="' . esc_attr($field_id) . '_date" name="' . esc_attr($field_name) . '[date]" value="' . esc_attr($date_val) . '" class="persian-datepicker-alt">';
+                                    echo '</div>';
+                                } else {
+                                    echo '<div class="wpd-datepicker-wrapper" style="display:inline-block; margin-left: 10px;">';
+                                    echo '<input type="text" id="' . esc_attr($field_id) . '_date" name="' . esc_attr($field_name) . '[date]" value="' . esc_attr($date_val) . '" class="regular-text wpd-gregorian-datepicker" autocomplete="off" style="width: 150px;">';
+                                    echo '</div>';
+                                }
+                                echo '<input type="time" id="' . esc_attr($field_id) . '_time" name="' . esc_attr($field_name) . '[time]" value="' . esc_attr($time_val) . '" class="regular-text" style="direction: ltr;">';
                                 break;
                             case 'gallery':
                                 echo '<div class="wpd-gallery-field-wrapper">';
                                 echo '<a href="#" class="button wpd-upload-gallery-button">'.__('مدیریت گالری', 'wp-directory').'</a>';
-                                echo '<input type="hidden" id="'.esc_attr($meta_key).'" name="'.esc_attr($field_name).'" value="'.esc_attr($value).'">';
+                                echo '<input type="hidden" id="'.esc_attr($field_id).'" name="'.esc_attr($field_name).'" value="'.esc_attr($value).'">';
                                 echo '<div class="gallery-preview">';
                                 $image_ids = array_filter(explode(',', $value));
                                 if (!empty($image_ids)) {
@@ -1081,7 +1020,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 break;
                             case 'map':
                                 echo '<div class="wpd-map-field-wrapper">';
-                                echo '<input type="text" id="'.esc_attr($meta_key).'" name="'.esc_attr($field_name).'" value="'.esc_attr($value).'" placeholder="32.4279,53.6880">';
+                                echo '<input type="text" id="'.esc_attr($field_id).'" name="'.esc_attr($field_name).'" value="'.esc_attr($value).'" placeholder="32.4279,53.6880">';
                                 echo '<div class="map-preview" style="width:100%; height:250px; background:#eee; margin-top:10px;"></div>';
                                 echo '</div>';
                                 break;
@@ -1105,7 +1044,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 echo '<a href="#" class="button wpd-repeater-add-row">' . __('افزودن ردیف جدید', 'wp-directory') . '</a>';
                                 echo '</div>';
                                 break;
-                            default: echo '<input type="' . esc_attr($meta_key) . '" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text">'; break;
+                            default: echo '<input type="text" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text">'; break;
                         }
                         ?>
                     </td>
@@ -1127,11 +1066,11 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             switch ($column) {
                 case 'listing_type':
                     $type_id = get_post_meta($post_id, '_wpd_listing_type', true);
-                    echo $type_id ? get_the_title($type_id) : '---';
+                    echo $type_id ? esc_html(get_the_title($type_id)) : '---';
                     break;
                 case 'expiration_date':
                     $date = get_post_meta($post_id, '_wpd_expiration_date', true);
-                    echo $date ? date_i18n('Y/m/d', strtotime($date)) : __('نامحدود', 'wp-directory');
+                    echo $date ? esc_html(date_i18n('Y/m/d', strtotime($date))) : __('نامحدود', 'wp-directory');
                     break;
             }
         }
@@ -1147,9 +1086,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
         public function render_package_columns($column, $post_id) {
             switch ($column) {
-                case 'price': echo number_format(get_post_meta($post_id, '_price', true)); break;
-                case 'duration': echo get_post_meta($post_id, '_duration', true) ?: __('نامحدود', 'wp-directory'); break;
-                case 'limit': echo get_post_meta($post_id, '_listing_limit', true) ?: __('نامحدود', 'wp-directory'); break;
+                case 'price': echo esc_html(number_format(get_post_meta($post_id, '_price', true))); break;
+                case 'duration': echo esc_html(get_post_meta($post_id, '_duration', true)) ?: __('نامحدود', 'wp-directory'); break;
+                case 'limit': echo esc_html(get_post_meta($post_id, '_listing_limit', true)) ?: __('نامحدود', 'wp-directory'); break;
             }
         }
 
@@ -1165,7 +1104,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
         public function render_upgrade_columns($column, $post_id) {
             switch ($column) {
                 case 'price':
-                    echo number_format(get_post_meta($post_id, '_price', true));
+                    echo esc_html(number_format(get_post_meta($post_id, '_price', true)));
                     break;
                 case 'upgrade_type':
                     $type = get_post_meta($post_id, '_upgrade_type', true);
@@ -1175,14 +1114,14 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         'top_of_category' => __('پین در بالای دسته', 'wp-directory'),
                         'urgent' => __('برچسب فوری', 'wp-directory'),
                     ];
-                    echo $types[$type] ?? esc_html($type);
+                    echo esc_html($types[$type] ?? $type);
                     break;
                 case 'duration':
                     $type = get_post_meta($post_id, '_upgrade_type', true);
                     if ($type === 'bump_up') {
                         echo '---';
                     } else {
-                        echo get_post_meta($post_id, '_duration', true) ?: __('نامحدود', 'wp-directory');
+                        echo esc_html(get_post_meta($post_id, '_duration', true)) ?: __('نامحدود', 'wp-directory');
                     }
                     break;
             }
