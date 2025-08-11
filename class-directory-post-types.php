@@ -8,14 +8,18 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
     class Directory_Post_Types {
 
+        private $is_parsidate_active;
+
         public function __construct() {
+            // Check for Parsi Date plugin once
+            $this->is_parsidate_active = function_exists('parsidate');
+
             add_action( 'init', [ $this, 'register_post_types' ] );
             add_action( 'init', [ $this, 'register_global_taxonomies' ] );
             add_action( 'init', [ $this, 'register_dynamic_taxonomies' ], 10 );
             add_action( 'add_meta_boxes', [ $this, 'add_meta_boxes' ] );
             add_action( 'admin_menu', [ $this, 'remove_default_meta_boxes' ] );
             
-            // Save hooks
             add_action( 'save_post_wpd_listing', [ $this, 'save_listing_meta_data' ] );
             add_action( 'save_post_wpd_listing_type', [ $this, 'save_listing_type_meta_data' ] );
             add_action( 'save_post_wpd_upgrade', [ $this, 'save_upgrade_meta_data' ] );
@@ -24,7 +28,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             add_action( 'admin_footer', [ $this, 'admin_scripts' ] );
             add_action( 'wp_ajax_wpd_load_admin_fields_and_taxonomies', [ $this, 'ajax_load_admin_fields_and_taxonomies' ] );
 
-            // افزودن ستون‌های سفارشی
             add_filter( 'manage_wpd_listing_posts_columns', [ $this, 'add_listing_columns' ] );
             add_action( 'manage_wpd_listing_posts_custom_column', [ $this, 'render_listing_columns' ], 10, 2 );
             add_filter( 'manage_wpd_package_posts_columns', [ $this, 'add_package_columns' ] );
@@ -94,7 +97,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 'labels'             => $upgrade_labels,
                 'public'             => false,
                 'show_ui'            => true,
-                'show_in_menu'       => false, // Will be added as submenu manually
+                'show_in_menu'       => false,
                 'capability_type'    => 'post',
                 'supports'           => [ 'title' ],
             ];
@@ -167,13 +170,11 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
         public function add_meta_boxes() {
             add_meta_box( 'wpd_listing_type_mb', __( 'اطلاعات اصلی آگهی', 'wp-directory' ), [ $this, 'render_listing_type_metabox' ], 'wpd_listing', 'normal', 'high' );
             
-            // Meta boxes for Listing Type CPT
             add_meta_box( 'wpd_listing_type_settings_mb', __( 'تنظیمات اصلی نوع آگهی', 'wp-directory' ), [ $this, 'render_listing_type_settings_metabox' ], 'wpd_listing_type', 'normal', 'high' );
             add_meta_box( 'wpd_field_builder_mb', __( 'فیلد ساز', 'wp-directory' ), [ $this, 'render_field_builder_metabox' ], 'wpd_listing_type', 'normal', 'default' );
             add_meta_box( 'wpd_taxonomy_builder_mb', __( 'طبقه‌بندی ساز', 'wp-directory' ), [ $this, 'render_taxonomy_builder_metabox' ], 'wpd_listing_type', 'normal', 'default' );
             add_meta_box( 'wpd_notification_settings_mb', __( 'تنظیمات اعلان‌های این نوع', 'wp-directory' ), [ $this, 'render_notification_settings_metabox' ], 'wpd_listing_type', 'side', 'default' );
 
-            // Add meta box for Upgrade Package CPT
             add_meta_box( 'wpd_upgrade_details_mb', __( 'جزئیات بسته ارتقا', 'wp-directory' ), [ $this, 'render_upgrade_details_metabox' ], 'wpd_upgrade', 'normal', 'high' );
         }
 
@@ -262,50 +263,83 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( ! is_array( $fields ) ) $fields = [];
             ?>
             <div id="wpd-field-builder-wrapper">
-                <div id="wpd-fields-container">
+                <div id="wpd-fields-container" class="wpd-sortable-list">
                     <?php if ( ! empty( $fields ) ) : foreach ( $fields as $index => $field ) : ?>
-                        <div class="wpd-field-row">
-                            <span class="dashicons dashicons-move handle"></span>
-                            <div class="wpd-field-inputs">
-                                <input type="text" name="wpd_fields[<?php echo $index; ?>][label]" value="<?php echo esc_attr( $field['label'] ?? '' ); ?>" placeholder="<?php _e( 'عنوان فیلد', 'wp-directory' ); ?>">
-                                <input type="text" name="wpd_fields[<?php echo $index; ?>][key]" value="<?php echo esc_attr( $field['key'] ?? '' ); ?>" placeholder="<?php _e( 'کلید متا (انگلیسی)', 'wp-directory' ); ?>">
-                                <select class="wpd-field-type-selector" name="wpd_fields[<?php echo $index; ?>][type]">
-                                    <optgroup label="<?php _e('فیلدهای پایه', 'wp-directory'); ?>">
-                                        <option value="text" <?php selected( $field['type'], 'text' ); ?>><?php _e( 'متن', 'wp-directory' ); ?></option>
-                                        <option value="textarea" <?php selected( $field['type'], 'textarea' ); ?>><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
-                                        <option value="number" <?php selected( $field['type'], 'number' ); ?>><?php _e( 'عدد', 'wp-directory' ); ?></option>
-                                        <option value="email" <?php selected( $field['type'], 'email' ); ?>><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
-                                        <option value="url" <?php selected( $field['type'], 'url' ); ?>><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
-                                    </optgroup>
-                                    <optgroup label="<?php _e('فیلدهای اعتبارسنجی', 'wp-directory'); ?>">
-                                        <option value="mobile" <?php selected( $field['type'], 'mobile' ); ?>><?php _e( 'شماره موبایل', 'wp-directory' ); ?></option>
-                                        <option value="phone" <?php selected( $field['type'], 'phone' ); ?>><?php _e( 'شماره تلفن ثابت', 'wp-directory' ); ?></option>
-                                        <option value="postal_code" <?php selected( $field['type'], 'postal_code' ); ?>><?php _e( 'کد پستی', 'wp-directory' ); ?></option>
-                                        <option value="national_id" <?php selected( $field['type'], 'national_id' ); ?>><?php _e( 'کد ملی', 'wp-directory' ); ?></option>
-                                    </optgroup>
-                                    <optgroup label="<?php _e('فیلدهای انتخاب', 'wp-directory'); ?>">
-                                        <option value="select" <?php selected( $field['type'], 'select' ); ?>><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
-                                        <option value="multiselect" <?php selected( $field['type'], 'multiselect' ); ?>><?php _e( 'چند انتخابی', 'wp-directory' ); ?></option>
-                                        <option value="checkbox" <?php selected( $field['type'], 'checkbox' ); ?>><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
-                                        <option value="radio" <?php selected( $field['type'], 'radio' ); ?>><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
-                                    </optgroup>
-                                    <optgroup label="<?php _e('فیلدهای زمان و تاریخ', 'wp-directory'); ?>">
-                                        <option value="date" <?php selected( $field['type'], 'date' ); ?>><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
-                                        <option value="time" <?php selected( $field['type'], 'time' ); ?>><?php _e( 'ساعت', 'wp-directory' ); ?></option>
-                                        <option value="datetime" <?php selected( $field['type'], 'datetime' ); ?>><?php _e( 'تاریخ و ساعت (شمسی)', 'wp-directory' ); ?></option>
-                                    </optgroup>
-                                    <optgroup label="<?php _e('فیلدهای پیشرفته', 'wp-directory'); ?>">
-                                        <option value="gallery" <?php selected( $field['type'], 'gallery' ); ?>><?php _e( 'گالری تصاویر', 'wp-directory' ); ?></option>
-                                        <option value="map" <?php selected( $field['type'], 'map' ); ?>><?php _e( 'نقشه', 'wp-directory' ); ?></option>
-                                    </optgroup>
-                                </select>
-                                <textarea name="wpd_fields[<?php echo $index; ?>][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما)', 'wp-directory' ); ?>" style="<?php echo in_array(($field['type'] ?? ''), ['select', 'multiselect', 'checkbox', 'radio']) ? '' : 'display:none;'; ?>"><?php echo esc_textarea( $field['options'] ?? '' ); ?></textarea>
-                            </div>
-                            <a href="#" class="button wpd-remove-field"><?php _e( 'حذف', 'wp-directory' ); ?></a>
-                        </div>
+                        <?php $this->render_field_builder_row($index, $field); ?>
                     <?php endforeach; endif; ?>
                 </div>
                 <a href="#" id="wpd-add-field" class="button button-primary"><?php _e( 'افزودن فیلد جدید', 'wp-directory' ); ?></a>
+            </div>
+            <?php
+        }
+
+        private function render_field_builder_row($index, $field_data = []) {
+            $label = $field_data['label'] ?? '';
+            $key = $field_data['key'] ?? '';
+            $type = $field_data['type'] ?? 'text';
+            $options = $field_data['options'] ?? '';
+            $sub_fields = $field_data['sub_fields'] ?? [];
+            ?>
+            <div class="wpd-field-row" data-index="<?php echo esc_attr($index); ?>">
+                <div class="wpd-field-header">
+                    <span class="dashicons dashicons-move handle"></span>
+                    <strong><?php echo esc_html($label) ?: __('فیلد جدید', 'wp-directory'); ?></strong> (<?php echo esc_html($type); ?>)
+                    <a href="#" class="wpd-toggle-field-details"><?php _e('جزئیات', 'wp-directory'); ?></a>
+                </div>
+                <div class="wpd-field-details" style="display:none;">
+                    <div class="wpd-field-inputs">
+                        <input type="text" name="wpd_fields[<?php echo esc_attr($index); ?>][label]" value="<?php echo esc_attr($label); ?>" placeholder="<?php _e( 'عنوان فیلد', 'wp-directory' ); ?>" class="field-label-input">
+                        <input type="text" name="wpd_fields[<?php echo esc_attr($index); ?>][key]" value="<?php echo esc_attr($key); ?>" placeholder="<?php _e( 'کلید متا (انگلیسی)', 'wp-directory' ); ?>">
+                        <select class="wpd-field-type-selector" name="wpd_fields[<?php echo esc_attr($index); ?>][type]">
+                            <optgroup label="<?php _e('فیلدهای پایه', 'wp-directory'); ?>">
+                                <option value="text" <?php selected( $type, 'text' ); ?>><?php _e( 'متن', 'wp-directory' ); ?></option>
+                                <option value="textarea" <?php selected( $type, 'textarea' ); ?>><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
+                                <option value="number" <?php selected( $type, 'number' ); ?>><?php _e( 'عدد', 'wp-directory' ); ?></option>
+                                <option value="email" <?php selected( $type, 'email' ); ?>><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
+                                <option value="url" <?php selected( $type, 'url' ); ?>><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
+                            </optgroup>
+                            <optgroup label="<?php _e('فیلدهای اعتبارسنجی', 'wp-directory'); ?>">
+                                <option value="mobile" <?php selected( $type, 'mobile' ); ?>><?php _e( 'شماره موبایل', 'wp-directory' ); ?></option>
+                                <option value="phone" <?php selected( $type, 'phone' ); ?>><?php _e( 'شماره تلفن ثابت', 'wp-directory' ); ?></option>
+                                <option value="postal_code" <?php selected( $type, 'postal_code' ); ?>><?php _e( 'کد پستی', 'wp-directory' ); ?></option>
+                                <option value="national_id" <?php selected( $type, 'national_id' ); ?>><?php _e( 'کد ملی', 'wp-directory' ); ?></option>
+                            </optgroup>
+                            <optgroup label="<?php _e('فیلدهای انتخاب', 'wp-directory'); ?>">
+                                <option value="select" <?php selected( $type, 'select' ); ?>><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
+                                <option value="multiselect" <?php selected( $type, 'multiselect' ); ?>><?php _e( 'چند انتخابی', 'wp-directory' ); ?></option>
+                                <option value="checkbox" <?php selected( $type, 'checkbox' ); ?>><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
+                                <option value="radio" <?php selected( $type, 'radio' ); ?>><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
+                            </optgroup>
+                            <optgroup label="<?php _e('فیلدهای زمان و تاریخ', 'wp-directory'); ?>">
+                                <option value="date" <?php selected( $type, 'date' ); ?>><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
+                                <option value="time" <?php selected( $type, 'time' ); ?>><?php _e( 'ساعت', 'wp-directory' ); ?></option>
+                                <option value="datetime" <?php selected( $type, 'datetime' ); ?>><?php _e( 'تاریخ و ساعت (شمسی)', 'wp-directory' ); ?></option>
+                            </optgroup>
+                            <optgroup label="<?php _e('فیلدهای ساختاری', 'wp-directory'); ?>">
+                                <option value="section_title" <?php selected( $type, 'section_title' ); ?>><?php _e('عنوان بخش (Heading)', 'wp-directory'); ?></option>
+                                <option value="html_content" <?php selected( $type, 'html_content' ); ?>><?php _e('محتوای HTML', 'wp-directory'); ?></option>
+                            </optgroup>
+                            <optgroup label="<?php _e('فیلدهای پیشرفته', 'wp-directory'); ?>">
+                                <option value="gallery" <?php selected( $type, 'gallery' ); ?>><?php _e( 'گالری تصاویر', 'wp-directory' ); ?></option>
+                                <option value="map" <?php selected( $type, 'map' ); ?>><?php _e( 'نقشه', 'wp-directory' ); ?></option>
+                                <option value="repeater" <?php selected( $type, 'repeater' ); ?>><?php _e( 'تکرار شونده', 'wp-directory' ); ?></option>
+                            </optgroup>
+                        </select>
+                        <textarea name="wpd_fields[<?php echo esc_attr($index); ?>][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما) یا محتوای HTML', 'wp-directory' ); ?>" style="<?php echo in_array($type, ['select', 'multiselect', 'checkbox', 'radio', 'html_content']) ? '' : 'display:none;'; ?>"><?php echo esc_textarea($options); ?></textarea>
+                    </div>
+
+                    <div class="wpd-repeater-fields-wrapper" style="<?php echo ($type === 'repeater') ? '' : 'display:none;'; ?>">
+                        <h4><?php _e('فیلدهای داخلی تکرارشونده', 'wp-directory'); ?></h4>
+                        <div class="wpd-sortable-list wpd-repeater-sub-fields">
+                            <?php if (!empty($sub_fields)): foreach($sub_fields as $sub_index => $sub_field): ?>
+                                <?php $this->render_field_builder_row($index . '][sub_fields][' . $sub_index, $sub_field); ?>
+                            <?php endforeach; endif; ?>
+                        </div>
+                        <a href="#" class="button wpd-add-sub-field"><?php _e('افزودن فیلد داخلی', 'wp-directory'); ?></a>
+                    </div>
+
+                    <a href="#" class="button wpd-remove-field"><?php _e( 'حذف فیلد', 'wp-directory' ); ?></a>
+                </div>
             </div>
             <?php
         }
@@ -403,17 +437,11 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
             // Save field builder
             if ( isset( $_POST['wpd_field_builder_nonce'] ) && wp_verify_nonce( $_POST['wpd_field_builder_nonce'], 'wpd_save_field_builder_meta' ) ) {
+                $sanitized_fields = [];
                 if ( isset( $_POST['wpd_fields'] ) && is_array($_POST['wpd_fields']) ) {
-                    $sanitized_fields = [];
-                    foreach ( $_POST['wpd_fields'] as $field ) {
-                        if ( ! empty( $field['label'] ) && ! empty( $field['key'] ) ) {
-                            $sanitized_fields[] = [ 'label' => sanitize_text_field( $field['label'] ), 'key' => sanitize_key( $field['key'] ), 'type' => sanitize_text_field( $field['type'] ), 'options' => sanitize_textarea_field( $field['options'] ) ];
-                        }
-                    }
-                    update_post_meta( $post_id, '_wpd_custom_fields', $sanitized_fields );
-                } else {
-                    delete_post_meta($post_id, '_wpd_custom_fields');
+                    $sanitized_fields = $this->sanitize_field_builder_data($_POST['wpd_fields']);
                 }
+                update_post_meta( $post_id, '_wpd_custom_fields', $sanitized_fields );
             }
             
             // Save taxonomy builder
@@ -431,6 +459,28 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 }
             }
         }
+
+        private function sanitize_field_builder_data($fields) {
+            $sanitized_data = [];
+            if (!is_array($fields)) return $sanitized_data;
+
+            foreach ($fields as $field) {
+                if (empty($field['label']) || empty($field['key'])) continue;
+
+                $sanitized_field = [
+                    'label'   => sanitize_text_field($field['label']),
+                    'key'     => sanitize_key($field['key']),
+                    'type'    => sanitize_text_field($field['type']),
+                    'options' => sanitize_textarea_field($field['options']),
+                ];
+
+                if ($sanitized_field['type'] === 'repeater' && !empty($field['sub_fields']) && is_array($field['sub_fields'])) {
+                    $sanitized_field['sub_fields'] = $this->sanitize_field_builder_data($field['sub_fields']);
+                }
+                $sanitized_data[] = $sanitized_field;
+            }
+            return $sanitized_data;
+        }
         
         public function save_listing_meta_data( $post_id ) {
             if ( ! isset( $_POST['wpd_listing_nonce'] ) || ! wp_verify_nonce( $_POST['wpd_listing_nonce'], 'wpd_save_listing_meta' ) ) return;
@@ -441,65 +491,95 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 update_post_meta($post_id, '_wpd_listing_type', intval($_POST['wpd_listing_type']));
             }
 
-            if ( !isset($_POST['wpd_custom']) || !is_array($_POST['wpd_custom'])) {
-                return;
-            }
-
             $listing_type_id = get_post_meta($post_id, '_wpd_listing_type', true);
+            if (empty($listing_type_id)) return;
+
             $field_definitions = get_post_meta($listing_type_id, '_wpd_custom_fields', true);
-            $fields_map = [];
-            if (is_array($field_definitions)) {
-                foreach ($field_definitions as $def) {
-                    $fields_map['_wpd_' . $def['key']] = $def['type'];
+            if (empty($field_definitions) || !is_array($field_definitions)) return;
+            
+            $posted_data = $_POST['wpd_custom'] ?? [];
+
+            $this->process_and_save_fields($post_id, $field_definitions, $posted_data);
+        }
+
+        private function process_and_save_fields($post_id, $field_definitions, $posted_data, $meta_prefix = '_wpd_') {
+            foreach ($field_definitions as $field_def) {
+                $meta_key = $meta_prefix . sanitize_key($field_def['key']);
+                $value_exists = isset($posted_data[$field_def['key']]);
+                $posted_value = $value_exists ? $posted_data[$field_def['key']] : null;
+
+                if (!$value_exists && in_array($field_def['type'], ['checkbox', 'multiselect'])) {
+                    delete_post_meta($post_id, $meta_key);
+                    continue;
+                }
+
+                if (!$value_exists) {
+                    continue;
+                }
+
+                if ($field_def['type'] === 'datetime' && is_array($posted_value)) {
+                    $date = sanitize_text_field($posted_value['date'] ?? '');
+                    $time = sanitize_text_field($posted_value['time'] ?? '00:00');
+                    if (!empty($date)) {
+                        $posted_value = $date . ' ' . $time;
+                    } else {
+                        $posted_value = '';
+                    }
+                }
+
+                if ($field_def['type'] === 'repeater') {
+                    $repeater_data = [];
+                    if (is_array($posted_value) && !empty($field_def['sub_fields'])) {
+                        foreach ($posted_value as $row_data) {
+                            $sanitized_row = [];
+                            foreach ($field_def['sub_fields'] as $sub_field_def) {
+                                $sub_field_key = $sub_field_def['key'];
+                                if (isset($row_data[$sub_field_key])) {
+                                    $sanitized_row[$sub_field_key] = $this->sanitize_field_value($row_data[$sub_field_key], $sub_field_def['type']);
+                                }
+                            }
+                            if (!empty($sanitized_row)) {
+                                $repeater_data[] = $sanitized_row;
+                            }
+                        }
+                    }
+                    update_post_meta($post_id, $meta_key, $repeater_data);
+                } else {
+                    $sanitized_value = $this->sanitize_field_value($posted_value, $field_def['type']);
+                    update_post_meta($post_id, $meta_key, $sanitized_value);
                 }
             }
+        }
 
-            foreach ($_POST['wpd_custom'] as $key => $value) {
-                if(strpos($key, '_wpd_') !== 0) continue;
-
-                $sanitized_value = null;
-                $field_type = $fields_map[$key] ?? 'text';
-
-                // Sanitize based on field type
-                switch ($field_type) {
-                    case 'email':
-                        $sanitized_value = sanitize_email($value);
-                        break;
-                    case 'number':
-                        $sanitized_value = intval($value);
-                        break;
-                    case 'url':
-                        $sanitized_value = esc_url_raw($value);
-                        break;
-                    case 'textarea':
-                        $sanitized_value = sanitize_textarea_field($value);
-                        break;
-                    case 'checkbox':
-                    case 'multiselect':
-                        $sanitized_value = is_array($value) ? array_map('sanitize_text_field', $value) : sanitize_text_field($value);
-                        break;
-                    case 'gallery':
-                        $sanitized_value = implode(',', array_map('absint', explode(',', $value)));
-                        break;
-                    case 'mobile':
-                    case 'phone':
-                    case 'postal_code':
-                    case 'national_id':
-                        $sanitized_value = sanitize_text_field(preg_replace('/[^0-9]/', '', $value));
-                        break;
-                    case 'map':
-                    case 'text':
-                    case 'select':
-                    case 'radio':
-                    case 'date':
-                    case 'time':
-                    case 'datetime':
-                    default:
-                        $sanitized_value = sanitize_text_field($value);
-                        break;
-                }
-                
-                update_post_meta($post_id, sanitize_key($key), $sanitized_value);
+        private function sanitize_field_value($value, $type) {
+            switch ($type) {
+                case 'email':
+                    return sanitize_email($value);
+                case 'number':
+                    return intval($value);
+                case 'url':
+                    return esc_url_raw($value);
+                case 'textarea':
+                    return sanitize_textarea_field($value);
+                case 'checkbox':
+                case 'multiselect':
+                    return is_array($value) ? array_map('sanitize_text_field', $value) : sanitize_text_field($value);
+                case 'gallery':
+                    return implode(',', array_map('absint', explode(',', $value)));
+                case 'mobile':
+                case 'phone':
+                case 'postal_code':
+                case 'national_id':
+                    return sanitize_text_field(preg_replace('/[^0-9]/', '', $value));
+                case 'map':
+                case 'text':
+                case 'select':
+                case 'radio':
+                case 'date':
+                case 'time':
+                case 'datetime':
+                default:
+                    return sanitize_text_field($value);
             }
         }
 
@@ -521,6 +601,12 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( ($pagenow == 'post-new.php' || $pagenow == 'post.php') && in_array($post_type, ['wpd_listing', 'wpd_listing_type']) ) {
                 wp_enqueue_script('tags-box');
                 wp_enqueue_media();
+                wp_enqueue_script('jquery-ui-sortable');
+                
+                // **FIX:** Enqueue all necessary jQuery UI core components for datepicker
+                wp_enqueue_script('jquery-ui-core');
+                wp_enqueue_script('jquery-ui-datepicker');
+                wp_enqueue_style('wp-jquery-ui-dialog');
 
                 wp_enqueue_style('leaflet-css', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
                 wp_enqueue_script('leaflet-js', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js', [], '1.7.1', true);
@@ -533,96 +619,87 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_listing_type' ) {
                  ?>
                 <style>
-                    .wpd-field-row { display: flex; align-items: flex-start; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;}
-                    .wpd-field-row .handle { cursor: move; color: #888; margin-right: 10px; padding-top: 5px;}
-                    .wpd-field-inputs { display: flex; flex-wrap: wrap; flex-grow: 1; gap: 5px; }
+                    .wpd-field-row { margin-bottom: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;}
+                    .wpd-field-header { display: flex; align-items: center; padding: 10px; gap: 10px; }
+                    .wpd-field-header .handle { cursor: move; color: #888; }
+                    .wpd-field-header .wpd-toggle-field-details { margin-left: auto; text-decoration: none; }
+                    .wpd-field-details { padding: 10px; border-top: 1px solid #ddd; }
+                    .wpd-field-inputs { display: flex; flex-wrap: wrap; gap: 10px; }
                     .wpd-field-inputs input, .wpd-field-inputs select, .wpd-field-inputs textarea { margin: 0; }
                     .wpd-field-options { width: 100%; height: 60px; }
+                    .wpd-repeater-fields-wrapper { padding: 10px; margin-top: 10px; border: 1px dashed #ccc; background: #fff; }
+                    .wpd-repeater-sub-fields .wpd-field-row { border-style: dashed; }
                 </style>
-                <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
                         function toggleOptionsField(element) {
                             var fieldType = $(element).val();
-                            var optionsTextarea = $(element).siblings('.wpd-field-options');
-                            if (['select', 'multiselect', 'checkbox', 'radio'].includes(fieldType)) {
+                            var optionsTextarea = $(element).closest('.wpd-field-inputs').find('.wpd-field-options');
+                            if (['select', 'multiselect', 'checkbox', 'radio', 'html_content'].includes(fieldType)) {
                                 optionsTextarea.show();
                             } else {
                                 optionsTextarea.hide();
                             }
                         }
-                        $('#wpd-fields-container').on('change', '.wpd-field-type-selector', function() { toggleOptionsField(this); });
-                        $('.wpd-field-type-selector').each(function() { toggleOptionsField(this); });
-                        $('#wpd-fields-container, #wpd-taxonomies-container').sortable({ handle: '.handle', opacity: 0.6, cursor: 'move' });
-                        
+
+                        function toggleRepeaterFields(element) {
+                            var fieldType = $(element).val();
+                            var repeaterWrapper = $(element).closest('.wpd-field-details').find('.wpd-repeater-fields-wrapper');
+                            if (fieldType === 'repeater') {
+                                repeaterWrapper.show();
+                            } else {
+                                repeaterWrapper.hide();
+                            }
+                        }
+
+                        function initSortable() {
+                            $('.wpd-sortable-list').sortable({
+                                handle: '.handle',
+                                opacity: 0.7,
+                                placeholder: 'wpd-sortable-placeholder',
+                                start: function(e, ui) {
+                                    ui.placeholder.height(ui.item.height());
+                                }
+                            });
+                        }
+                        initSortable();
+
+                        $('#wpd-field-builder-wrapper').on('change', '.wpd-field-type-selector', function() {
+                            toggleOptionsField(this);
+                            toggleRepeaterFields(this);
+                        });
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-toggle-field-details', function(e) {
+                            e.preventDefault();
+                            $(this).closest('.wpd-field-row').find('.wpd-field-details').slideToggle('fast');
+                        });
+                        $('#wpd-field-builder-wrapper').on('keyup', '.field-label-input', function() {
+                            var newTitle = $(this).val() || 'فیلد جدید';
+                            $(this).closest('.wpd-field-row').find('.wpd-field-header strong').text(newTitle);
+                        });
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-remove-field', function(e) {
+                            e.preventDefault();
+                            if (confirm('آیا از حذف این فیلد مطمئن هستید؟')) {
+                                $(this).closest('.wpd-field-row').remove();
+                            }
+                        });
+
                         $('#wpd-add-field').on('click', function(e) {
                             e.preventDefault();
-                            var field_count = $('#wpd-fields-container .wpd-field-row').length;
-                            var new_field = `
-                                <div class="wpd-field-row">
-                                    <span class="dashicons dashicons-move handle"></span>
-                                    <div class="wpd-field-inputs">
-                                        <input type="text" name="wpd_fields[${field_count}][label]" placeholder="<?php _e( 'عنوان فیلد', 'wp-directory' ); ?>">
-                                        <input type="text" name="wpd_fields[${field_count}][key]" placeholder="<?php _e( 'کلید متا (انگلیسی)', 'wp-directory' ); ?>">
-                                        <select class="wpd-field-type-selector" name="wpd_fields[${field_count}][type]">
-                                            <optgroup label="<?php _e('فیلدهای پایه', 'wp-directory'); ?>">
-                                                <option value="text"><?php _e( 'متن', 'wp-directory' ); ?></option>
-                                                <option value="textarea"><?php _e( 'متن بلند', 'wp-directory' ); ?></option>
-                                                <option value="number"><?php _e( 'عدد', 'wp-directory' ); ?></option>
-                                                <option value="email"><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
-                                                <option value="url"><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
-                                            </optgroup>
-                                            <optgroup label="<?php _e('فیلدهای اعتبارسنجی', 'wp-directory'); ?>">
-                                                <option value="mobile"><?php _e( 'شماره موبایل', 'wp-directory' ); ?></option>
-                                                <option value="phone"><?php _e( 'شماره تلفن ثابت', 'wp-directory' ); ?></option>
-                                                <option value="postal_code"><?php _e( 'کد پستی', 'wp-directory' ); ?></option>
-                                                <option value="national_id"><?php _e( 'کد ملی', 'wp-directory' ); ?></option>
-                                            </optgroup>
-                                            <optgroup label="<?php _e('فیلدهای انتخاب', 'wp-directory'); ?>">
-                                                <option value="select"><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
-                                                <option value="multiselect"><?php _e( 'چند انتخابی', 'wp-directory' ); ?></option>
-                                                <option value="checkbox"><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
-                                                <option value="radio"><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
-                                            </optgroup>
-                                            <optgroup label="<?php _e('فیلدهای زمان و تاریخ', 'wp-directory'); ?>">
-                                                <option value="date"><?php _e( 'تاریخ (شمسی)', 'wp-directory' ); ?></option>
-                                                <option value="time"><?php _e( 'ساعت', 'wp-directory' ); ?></option>
-                                                <option value="datetime"><?php _e( 'تاریخ و ساعت (شمسی)', 'wp-directory' ); ?></option>
-                                            </optgroup>
-                                            <optgroup label="<?php _e('فیلدهای پیشرفته', 'wp-directory'); ?>">
-                                                <option value="gallery"><?php _e( 'گالری تصاویر', 'wp-directory' ); ?></option>
-                                                <option value="map"><?php _e( 'نقشه', 'wp-directory' ); ?></option>
-                                            </optgroup>
-                                        </select>
-                                        <textarea name="wpd_fields[${field_count}][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما)', 'wp-directory' ); ?>" style="display:none;"></textarea>
-                                    </div>
-                                    <a href="#" class="button wpd-remove-field"><?php _e( 'حذف', 'wp-directory' ); ?></a>
-                                </div>
-                            `;
-                            $('#wpd-fields-container').append(new_field);
+                            var container = $('#wpd-fields-container');
+                            var newIndex = container.children().length ? (Math.max.apply(null, container.children().map(function() { return $(this).data('index'); }).get()) + 1) : 0;
+                            var field_html = <?php echo json_encode($this->get_field_builder_row_html('__INDEX__')); ?>;
+                            container.append(field_html.replace(/__INDEX__/g, newIndex));
                         });
 
-                        $('#wpd-add-taxonomy').on('click', function(e) {
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-add-sub-field', function(e) {
                             e.preventDefault();
-                            var tax_count = $('#wpd-taxonomies-container .wpd-field-row').length;
-                            var new_tax = `
-                                <div class="wpd-field-row">
-                                    <span class="dashicons dashicons-move handle"></span>
-                                    <div class="wpd-field-inputs">
-                                        <input type="text" name="wpd_taxonomies[${tax_count}][name]" placeholder="<?php _e( 'نام طبقه‌بندی (فارسی)', 'wp-directory' ); ?>">
-                                        <input type="text" name="wpd_taxonomies[${tax_count}][slug]" placeholder="<?php _e( 'نامک (انگلیسی)', 'wp-directory' ); ?>">
-                                        <select name="wpd_taxonomies[${tax_count}][hierarchical]">
-                                            <option value="1"><?php _e('سلسله مراتبی', 'wp-directory'); ?></option>
-                                            <option value="0"><?php _e('غیر سلسله مراتبی (تگ)', 'wp-directory'); ?></option>
-                                        </select>
-                                    </div>
-                                    <a href="#" class="button wpd-remove-field"><?php _e( 'حذف', 'wp-directory' ); ?></a>
-                                </div>
-                            `;
-                            $('#wpd-taxonomies-container').append(new_tax);
+                            var subContainer = $(this).prev('.wpd-repeater-sub-fields');
+                            var parentIndex = $(this).closest('.wpd-field-row').data('index');
+                            var newSubIndex = subContainer.children().length;
+                            var namePrefix = parentIndex + '][sub_fields][' + newSubIndex;
+                            var field_html = <?php echo json_encode($this->get_field_builder_row_html('__INDEX__')); ?>;
+                            subContainer.append(field_html.replace(/__INDEX__/g, namePrefix));
                         });
-
-                        $('#wpd-field-builder-wrapper, #wpd-taxonomy-builder-wrapper').on('click', '.wpd-remove-field', function(e) { e.preventDefault(); $(this).closest('.wpd-field-row').remove(); });
                     });
                 </script>
                 <?php
@@ -635,170 +712,256 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     .wpd-gallery-field-wrapper .gallery-preview .image-container { position: relative; }
                     .wpd-gallery-field-wrapper .gallery-preview img { width: 100px; height: 100px; object-fit: cover; border: 1px solid #ddd; }
                     .wpd-gallery-field-wrapper .gallery-preview .remove-image { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; text-align: center; line-height: 20px; }
+                    .wpd-repeater-row { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; background: #fdfdfd; }
+                    .wpd-datepicker-wrapper { display: flex; align-items: center; }
+                    .wpd-datepicker-icon { cursor: pointer; vertical-align: middle; margin-right: 5px; }
+                    .ui-datepicker { z-index: 9999 !important; font-family: sans-serif; }
+                    .ui-datepicker-rtl { direction: rtl; }
+                    .ui-datepicker-rtl .ui-datepicker-prev { float: right; }
+                    .ui-datepicker-rtl .ui-datepicker-next { float: left; }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
-                        function initAdminFields(container) {
-                            // Gallery Field Logic
-                            container.find('.wpd-upload-gallery-button').on('click', function(e) {
-                                e.preventDefault();
-                                var button = $(this);
-                                var input = button.next('input[type="hidden"]');
-                                var preview = button.siblings('.gallery-preview');
-                                var image_ids = input.val() ? input.val().split(',').filter(Number) : [];
 
-                                var frame = wp.media({
-                                    title: '<?php _e("انتخاب تصاویر گالری", "wp-directory"); ?>',
-                                    button: { text: '<?php _e("استفاده از این تصاویر", "wp-directory"); ?>' },
-                                    multiple: 'add'
-                                });
+                        function initJalaliDatepicker(container) {
+                            if (typeof $.fn.datepicker === 'undefined') {
+                                console.error('WPD Error: jQuery UI Datepicker is not loaded.');
+                                return;
+                            }
 
-                                frame.on('open', function() {
-                                    var selection = frame.state().get('selection');
-                                    image_ids.forEach(function(id) {
-                                        var attachment = wp.media.attachment(id);
-                                        attachment.fetch();
-                                        selection.add(attachment ? [attachment] : []);
-                                    });
-                                });
+                            var jalaliMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+                            var jalaliDays = ['ی', 'د', 'س', 'چ', 'پ', 'ج', 'ش'];
 
-                                frame.on('select', function() {
-                                    var selection = frame.state().get('selection');
-                                    var new_ids = [];
-                                    preview.html('');
-                                    selection.each(function(attachment) {
-                                        new_ids.push(attachment.id);
-                                        preview.append('<div class="image-container"><img src="' + attachment.attributes.sizes.thumbnail.url + '"><span class="remove-image" data-id="' + attachment.id + '">×</span></div>');
-                                    });
-                                    input.val(new_ids.join(','));
-                                });
+                            function toJalali(gy, gm, gd) {
+                                var g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+                                var jy = (gy <= 1600) ? 0 : 979;
+                                gy -= (gy <= 1600) ? 621 : 1600;
+                                var gy2 = (gm > 2) ? (gy + 1) : gy;
+                                var days = 365 * gy + parseInt((gy2 + 3) / 4) - parseInt((gy2 + 99) / 100) + parseInt((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
+                                jy += 33 * parseInt(days / 12053);
+                                days %= 12053;
+                                jy += 4 * parseInt(days / 1461);
+                                days %= 1461;
+                                if (days > 365) { days = (days - 1) % 365; jy += parseInt((days) / 365); }
+                                var jm = (days < 186) ? 1 + parseInt(days / 31) : 7 + parseInt((days - 186) / 30);
+                                var jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+                                return [jy, jm, jd];
+                            }
 
-                                frame.open();
-                            });
-
-                            container.on('click', '.remove-image', function() {
-                                var id_to_remove = $(this).data('id');
-                                var container = $(this).closest('.wpd-gallery-field-wrapper');
-                                var input = container.find('input[type="hidden"]');
-                                var image_ids = input.val().split(',').filter(Number);
-                                var new_ids = image_ids.filter(function(id) {
-                                    return id !== id_to_remove;
-                                });
-                                input.val(new_ids.join(','));
-                                $(this).parent().remove();
-                            });
-
-                            // Map Field Logic (LeafletJS)
-                            container.find('.wpd-map-field-wrapper').each(function() {
-                                var wrapper = $(this);
-                                var input = wrapper.find('input[type="text"]');
-                                var mapContainer = wrapper.find('.map-preview')[0];
-                                var latlng = input.val() ? input.val().split(',') : [32.4279, 53.6880];
-
-                                var map = L.map(mapContainer).setView(latlng, 5);
-                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                }).addTo(map);
-
-                                var marker = L.marker(latlng, { draggable: true }).addTo(map);
-
-                                function updateInput(latlng) {
-                                    input.val(latlng.lat.toFixed(6) + ',' + latlng.lng.toFixed(6));
+                            function toGregorian(jy, jm, jd) {
+                                var gy = (jy <= 979) ? 621 : 1600;
+                                jy -= (jy <= 979) ? 0 : 979;
+                                var days = 365 * jy + parseInt(jy / 33) * 8 + parseInt(((jy % 33) + 3) / 4) + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+                                gy += 400 * parseInt(days / 146097);
+                                days %= 146097;
+                                if (days > 36524) {
+                                    gy += 100 * parseInt(--days / 36524);
+                                    days %= 36524;
+                                    if (days >= 365) days++;
                                 }
+                                gy += 4 * parseInt(days / 1461);
+                                days %= 1461;
+                                gy += parseInt((days - 1) / 365);
+                                if (days > 365) days = (days - 1) % 365;
+                                var gd = days + 1;
+                                var sal_a = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+                                var gm;
+                                for (gm = 0; gm < 13 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+                                return [gy, gm, gd];
+                            }
 
-                                marker.on('dragend', function(e) {
-                                    updateInput(e.target.getLatLng());
-                                });
-
-                                map.on('click', function(e) {
-                                    marker.setLatLng(e.latlng);
-                                    updateInput(e.latlng);
-                                });
-                            });
-                        }
-
-                        function setupPage() {
-                            hideAllTaxonomyMetaboxes();
-                            $('#wpd_listing_type_selector').on('change', function() {
-                                var type_id = $(this).val();
-                                var post_id = $('#post_ID').val();
-                                var fields_container = $('#wpd-admin-custom-fields-wrapper');
+                            container.find('.wpd-admin-datepicker').each(function() {
+                                var $input = $(this);
+                                if ($input.data('jalali-init')) return;
                                 
-                                hideAllTaxonomyMetaboxes();
+                                var wrapper = $input.closest('.wpd-datepicker-wrapper');
+                                var altField = wrapper.find('input[type="hidden"]');
 
-                                if(type_id === "") {
-                                    fields_container.html('');
-                                    return;
-                                }
-                                
-                                fields_container.html('<p class="spinner is-active" style="float:none;"></p>');
-
-                                $.ajax({
-                                    url: ajaxurl,
-                                    type: 'POST',
-                                    data: {
-                                        action: 'wpd_load_admin_fields_and_taxonomies',
-                                        type_id: type_id,
-                                        post_id: post_id,
-                                        _ajax_nonce: '<?php echo wp_create_nonce("wpd_admin_fields_nonce"); ?>'
-                                    },
-                                    success: function(response) {
-                                        if(response.success) {
-                                            fields_container.html(response.data.fields);
-                                            showSelectedTaxonomies(response.data.taxonomies);
-                                            initAdminFields(fields_container);
+                                $input.datepicker({
+                                    dateFormat: 'yy/mm/dd',
+                                    isRTL: true,
+                                    monthNames: jalaliMonths,
+                                    dayNamesMin: jalaliDays,
+                                    changeMonth: true,
+                                    changeYear: true,
+                                    beforeShow: function(input, inst) {
+                                        var gregorianDate = altField.val();
+                                        if (gregorianDate && gregorianDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                                            var parts = gregorianDate.split('-');
+                                            var jalali = toJalali(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+                                            $input.val(jalali[0] + '/' + (jalali[1] < 10 ? '0' : '') + jalali[1] + '/' + (jalali[2] < 10 ? '0' : '') + jalali[2]);
                                         } else {
-                                            fields_container.html('<p style="color:red;">' + response.data.message + '</p>');
+                                            $input.val('');
                                         }
                                     },
-                                    error: function() {
-                                         fields_container.html('<p style="color:red;">خطا در برقراری ارتباط.</p>');
+                                    onSelect: function(dateText, inst) {
+                                        var jalaliParts = dateText.split('/');
+                                        var gregorian = toGregorian(parseInt(jalaliParts[0]), parseInt(jalaliParts[1]), parseInt(jalaliParts[2]));
+                                        var gregorianStr = gregorian[0] + '-' + (gregorian[1] < 10 ? '0' : '') + gregorian[1] + '-' + (gregorian[2] < 10 ? '0' : '') + gregorian[2];
+                                        altField.val(gregorianStr).trigger('change');
                                     }
                                 });
-                            }).trigger('change');
+
+                                if (altField.val()) {
+                                    var initialDate = new Date(altField.val());
+                                    if (!isNaN(initialDate)) {
+                                        $input.datepicker('setDate', initialDate);
+                                    }
+                                }
+                                
+                                $input.data('jalali-init', true);
+                            });
+
+                            container.off('click', '.wpd-datepicker-icon').on('click', '.wpd-datepicker-icon', function(e) {
+                                e.preventDefault();
+                                $(this).siblings('input.wpd-admin-datepicker').datepicker('show');
+                            });
                         }
 
-                        function hideAllTaxonomyMetaboxes() {
-                             $('#side-sortables').find('.postbox').each(function(){
-                                var id = $(this).attr('id');
-                                var keep_ids = ['submitdiv', 'wpd_listing_categorydiv', 'wpd_listing_locationdiv'];
-                                if( ! keep_ids.includes(id) ) {
-                                    $(this).hide();
-                                }
-                             });
-                        }
-                        
-                        function showSelectedTaxonomies(tax_slugs) {
-                            if(tax_slugs && tax_slugs.length > 0) {
-                                tax_slugs.forEach(function(tax_slug) {
-                                    $('#' + tax_slug + 'div, #tagsdiv-' + tax_slug).show();
+                        function initOtherAdvancedFields(container) {
+                            try {
+                                container.find('.wpd-upload-gallery-button').off('click').on('click', function(e) {
+                                    e.preventDefault();
+                                    var button = $(this);
+                                    var input = button.siblings('input[type="hidden"]');
+                                    var preview = button.siblings('.gallery-preview');
+                                    var image_ids = input.val() ? input.val().split(',').map(Number).filter(Boolean) : [];
+
+                                    var frame = wp.media({
+                                        title: '<?php _e("انتخاب تصاویر گالری", "wp-directory"); ?>',
+                                        button: { text: '<?php _e("استفاده از این تصاویر", "wp-directory"); ?>' },
+                                        multiple: 'add'
+                                    });
+
+                                    frame.on('open', function() {
+                                        var selection = frame.state().get('selection');
+                                        image_ids.forEach(function(id) {
+                                            var attachment = wp.media.attachment(id);
+                                            attachment.fetch();
+                                            selection.add(attachment ? [attachment] : []);
+                                        });
+                                    });
+
+                                    frame.on('select', function() {
+                                        var selection = frame.state().get('selection');
+                                        var new_ids = [];
+                                        preview.html('');
+                                        selection.each(function(attachment) {
+                                            new_ids.push(attachment.id);
+                                            preview.append('<div class="image-container"><img src="' + attachment.attributes.sizes.thumbnail.url + '"><span class="remove-image" data-id="' + attachment.id + '">×</span></div>');
+                                        });
+                                        input.val(new_ids.join(','));
+                                    });
+
+                                    frame.open();
                                 });
+
+                                container.on('click', '.remove-image', function() {
+                                    var id_to_remove = $(this).data('id');
+                                    var wrapper = $(this).closest('.wpd-gallery-field-wrapper');
+                                    var input = wrapper.find('input[type="hidden"]');
+                                    var image_ids = input.val().split(',').map(Number).filter(Boolean);
+                                    var new_ids = image_ids.filter(id => id !== id_to_remove);
+                                    input.val(new_ids.join(','));
+                                    $(this).parent().remove();
+                                });
+                            } catch (e) {
+                                console.error('WPD Error: Initializing gallery failed.', e);
+                            }
+
+                            try {
+                                container.find('.wpd-map-field-wrapper').each(function() {
+                                    var wrapper = $(this);
+                                    var input = wrapper.find('input[type="text"]');
+                                    var mapContainer = wrapper.find('.map-preview')[0];
+
+                                    if ($(mapContainer).data('leaflet-initialized')) return;
+                                    $(mapContainer).data('leaflet-initialized', true);
+
+                                    var latlng = input.val() ? input.val().split(',') : [32.4279, 53.6880];
+                                    var map = L.map(mapContainer).setView(latlng, 5);
+                                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                                    var marker = L.marker(latlng, { draggable: true }).addTo(map);
+
+                                    marker.on('dragend', function(e) {
+                                        input.val(e.target.getLatLng().lat.toFixed(6) + ',' + e.target.getLatLng().lng.toFixed(6));
+                                    });
+                                    map.on('click', function(e) {
+                                        marker.setLatLng(e.latlng);
+                                        input.val(e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6));
+                                    });
+
+                                    setTimeout(function() { map.invalidateSize() }, 200);
+                                });
+                            } catch(e) {
+                                console.error('WPD Error: Initializing map failed.', e);
                             }
                         }
-                        
-                        setupPage();
-                    });
-                </script>
-                <?php
-            }
 
-            if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_upgrade' ) {
-                ?>
-                <script type="text/javascript">
-                    jQuery(document).ready(function($) {
-                        $('#wpd_upgrade_type').on('change', function() {
-                            if ($(this).val() === 'bump_up') {
-                                $('.wpd-duration-row').hide();
-                            } else {
-                                $('.wpd-duration-row').show();
+                        $('#wpd_listing_type_selector').on('change', function() {
+                            var type_id = $(this).val();
+                            var post_id = $('#post_ID').val();
+                            var fields_container = $('#wpd-admin-custom-fields-wrapper');
+                            
+                            fields_container.html('<p class="spinner is-active" style="float:none;"></p>');
+                            
+                            $.ajax({
+                                url: ajaxurl,
+                                type: 'POST',
+                                data: {
+                                    action: 'wpd_load_admin_fields_and_taxonomies',
+                                    type_id: type_id,
+                                    post_id: post_id,
+                                    _ajax_nonce: '<?php echo wp_create_nonce("wpd_admin_fields_nonce"); ?>'
+                                },
+                                success: function(response) {
+                                    if(response.success) {
+                                        fields_container.html(response.data.fields);
+                                        initJalaliDatepicker(fields_container);
+                                        initOtherAdvancedFields(fields_container);
+                                    } else {
+                                        fields_container.html('<p style="color:red;">' + response.data.message + '</p>');
+                                    }
+                                },
+                                error: function() {
+                                     fields_container.html('<p style="color:red;">خطا در برقراری ارتباط.</p>');
+                                }
+                            });
+                        });
+
+                        $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-add-row', function(e) {
+                            e.preventDefault();
+                            var template = $(this).siblings('.wpd-repeater-template');
+                            var container = $(this).siblings('.wpd-repeater-rows-container');
+                            var newIndex = container.children().length;
+                            var newRowHtml = template.html().replace(/__INDEX__/g, newIndex);
+                            var newRow = $(newRowHtml).appendTo(container);
+                            initJalaliDatepicker(newRow);
+                            initOtherAdvancedFields(newRow);
+                        });
+
+                        $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-remove-row', function(e) {
+                            e.preventDefault();
+                            if(confirm('آیا از حذف این ردیف مطمئن هستید؟')) {
+                                $(this).closest('.wpd-repeater-row').remove();
                             }
                         });
+
+                        // Initial call
+                        initJalaliDatepicker($('#wpd-admin-custom-fields-wrapper'));
+                        initOtherAdvancedFields($('#wpd-admin-custom-fields-wrapper'));
                     });
                 </script>
                 <?php
             }
         }
         
+        private function get_field_builder_row_html($index_placeholder) {
+            ob_start();
+            $this->render_field_builder_row($index_placeholder);
+            return ob_get_clean();
+        }
+
         public function ajax_load_admin_fields_and_taxonomies() {
             check_ajax_referer('wpd_admin_fields_nonce');
             
@@ -823,9 +986,27 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
             ob_start();
             echo '<table class="form-table"><tbody>';
+            $this->render_admin_fields_recursive($fields, $post_id);
+            echo '</tbody></table>';
+            return ob_get_clean();
+        }
+
+        private function render_admin_fields_recursive($fields, $post_id, $row_data = [], $name_prefix = 'wpd_custom', $meta_prefix = '_wpd_') {
             foreach ($fields as $field) {
-                $meta_key = '_wpd_' . sanitize_key($field['key']);
-                $value = get_post_meta($post_id, $meta_key, true);
+                $field_key = $field['key'];
+                $meta_key = $meta_prefix . sanitize_key($field_key);
+                $field_name = $name_prefix . '[' . $field_key . ']';
+                $value = ($meta_prefix === '') ? ($row_data[$field_key] ?? '') : get_post_meta($post_id, $meta_key, true);
+
+                if ($field['type'] === 'section_title') {
+                    echo '<tr><td colspan="2"><h3 class="wpd-section-title">' . esc_html($field['label']) . '</h3></td></tr>';
+                    continue;
+                }
+                if ($field['type'] === 'html_content') {
+                    echo '<tr><td colspan="2">' . wp_kses_post($field['options']) . '</td></tr>';
+                    continue;
+                }
+
                 ?>
                 <tr>
                     <th><label for="<?php echo esc_attr($meta_key); ?>"><?php echo esc_html($field['label']); ?></label></th>
@@ -833,26 +1014,61 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         <?php
                         $options = !empty($field['options']) ? array_map('trim', explode(',', $field['options'])) : [];
                         switch($field['type']) {
-                            case 'textarea': echo '<textarea id="' . esc_attr($meta_key) . '" name="wpd_custom[' . esc_attr($meta_key) . ']" class="large-text">' . esc_textarea($value) . '</textarea>'; break;
+                            case 'textarea': echo '<textarea id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" class="large-text">' . esc_textarea($value) . '</textarea>'; break;
                             case 'select':
-                                echo '<select id="' . esc_attr($meta_key) . '" name="wpd_custom[' . esc_attr($meta_key) . ']">';
+                                echo '<select id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '">';
                                 echo '<option value="">-- انتخاب کنید --</option>';
                                 foreach($options as $option) echo '<option value="'.esc_attr($option).'" '.selected($value, $option, false).'>'.esc_html($option).'</option>';
                                 echo '</select>';
                                 break;
+                            case 'multiselect':
+                                echo '<select id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '[]" multiple class="large-text">';
+                                $saved_values = is_array($value) ? $value : [];
+                                foreach($options as $option) echo '<option value="'.esc_attr($option).'" '.(in_array($option, $saved_values) ? 'selected' : '').'>'.esc_html($option).'</option>';
+                                echo '</select>';
+                                break;
                             case 'checkbox':
-                                $saved_values = is_array($value) ? $value : (array)$value;
-                                foreach($options as $option) echo '<label><input type="checkbox" name="wpd_custom[' . esc_attr($meta_key) . '][]" value="'.esc_attr($option).'" '.(in_array($option, $saved_values) ? 'checked' : '').'> '.esc_html($option).'</label><br>';
+                                $saved_values = is_array($value) ? $value : [];
+                                foreach($options as $option) echo '<label><input type="checkbox" name="' . esc_attr($field_name) . '[]" value="'.esc_attr($option).'" '.(in_array($option, $saved_values) ? 'checked' : '').'> '.esc_html($option).'</label><br>';
                                 break;
                             case 'radio':
-                                foreach($options as $option) echo '<label><input type="radio" name="wpd_custom[' . esc_attr($meta_key) . ']" value="'.esc_attr($option).'" '.checked($value, $option, false).'> '.esc_html($option).'</label><br>';
+                                foreach($options as $option) echo '<label><input type="radio" name="' . esc_attr($field_name) . '" value="'.esc_attr($option).'" '.checked($value, $option, false).'> '.esc_html($option).'</label><br>';
+                                break;
+                            case 'date': 
+                                $display_value = '';
+                                if ($this->is_parsidate_active && !empty($value)) {
+                                    $display_value = parsidate('Y/m/d', $value, 'gregorian');
+                                }
+                                $class = $this->is_parsidate_active ? 'persian-datepicker' : 'wpd-datepicker';
+                                echo '<div class="wpd-datepicker-wrapper">';
+                                echo '<input type="text" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($display_value) . '" class="regular-text ' . $class . '" autocomplete="off">';
+                                echo '<span class="dashicons dashicons-calendar-alt wpd-datepicker-icon"></span>';
+                                echo '</div>';
+                                break;
+                            case 'time':
+                                echo '<input type="time" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text" style="direction: ltr;">';
+                                break;
+                            case 'datetime':
+                                $date_val = !empty($value) ? date('Y-m-d H:i:s', strtotime($value)) : '';
+                                $display_value = '';
+                                if ($this->is_parsidate_active && !empty($date_val)) {
+                                    $display_value = parsidate('Y/m/d', $date_val, 'gregorian');
+                                }
+                                $class = $this->is_parsidate_active ? 'persian-datepicker' : 'wpd-datepicker';
+                                $time_val = !empty($value) ? date('H:i', strtotime($value)) : '';
+
+                                echo '<div class="wpd-datepicker-wrapper" style="display:inline-block; margin-left: 10px;">';
+                                echo '<input type="text" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '[date]" value="' . esc_attr($display_value) . '" class="regular-text ' . $class . '" autocomplete="off" style="width: 150px;">';
+                                echo '<span class="dashicons dashicons-calendar-alt wpd-datepicker-icon"></span>';
+                                echo '</div>';
+                                echo '<input type="time" id="' . esc_attr($meta_key) . '_time" name="' . esc_attr($field_name) . '[time]" value="' . esc_attr($time_val) . '" class="regular-text" style="direction: ltr;">';
                                 break;
                             case 'gallery':
-                                $image_ids = array_filter(explode(',', $value));
                                 echo '<div class="wpd-gallery-field-wrapper">';
                                 echo '<a href="#" class="button wpd-upload-gallery-button">'.__('مدیریت گالری', 'wp-directory').'</a>';
-                                echo '<input type="hidden" id="'.esc_attr($meta_key).'" name="wpd_custom['.esc_attr($meta_key).']" value="'.esc_attr($value).'">';
+                                echo '<input type="hidden" id="'.esc_attr($meta_key).'" name="'.esc_attr($field_name).'" value="'.esc_attr($value).'">';
                                 echo '<div class="gallery-preview">';
+                                $image_ids = array_filter(explode(',', $value));
                                 if (!empty($image_ids)) {
                                     foreach ($image_ids as $id) {
                                         $image_url = wp_get_attachment_image_url($id, 'thumbnail');
@@ -865,19 +1081,37 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 break;
                             case 'map':
                                 echo '<div class="wpd-map-field-wrapper">';
-                                echo '<input type="text" id="'.esc_attr($meta_key).'" name="wpd_custom['.esc_attr($meta_key).']" value="'.esc_attr($value).'" placeholder="32.4279,53.6880">';
+                                echo '<input type="text" id="'.esc_attr($meta_key).'" name="'.esc_attr($field_name).'" value="'.esc_attr($value).'" placeholder="32.4279,53.6880">';
                                 echo '<div class="map-preview" style="width:100%; height:250px; background:#eee; margin-top:10px;"></div>';
                                 echo '</div>';
                                 break;
-                            default: echo '<input type="' . esc_attr($field['type']) . '" id="' . esc_attr($meta_key) . '" name="wpd_custom[' . esc_attr($meta_key) . ']" value="' . esc_attr($value) . '" class="regular-text">'; break;
+                            case 'repeater':
+                                $rows = is_array($value) ? $value : [];
+                                echo '<div class="wpd-repeater-field-wrapper">';
+                                echo '<div class="wpd-repeater-rows-container">';
+                                if (!empty($rows)) {
+                                    foreach ($rows as $index => $row_data) {
+                                        echo '<div class="wpd-repeater-row"><table class="form-table">';
+                                        $this->render_admin_fields_recursive($field['sub_fields'], $post_id, $row_data, $field_name . '[' . $index . ']', '');
+                                        echo '</table><a href="#" class="button button-small wpd-repeater-remove-row">' . __('حذف ردیف', 'wp-directory') . '</a></div>';
+                                    }
+                                }
+                                echo '</div>';
+                                echo '<div class="wpd-repeater-template" style="display:none;">';
+                                echo '<div class="wpd-repeater-row"><table class="form-table">';
+                                $this->render_admin_fields_recursive($field['sub_fields'], $post_id, [], $field_name . '[__INDEX__]', '');
+                                echo '</table><a href="#" class="button button-small wpd-repeater-remove-row">' . __('حذف ردیف', 'wp-directory') . '</a></div>';
+                                echo '</div>';
+                                echo '<a href="#" class="button wpd-repeater-add-row">' . __('افزودن ردیف جدید', 'wp-directory') . '</a>';
+                                echo '</div>';
+                                break;
+                            default: echo '<input type="' . esc_attr($meta_key) . '" id="' . esc_attr($meta_key) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text">'; break;
                         }
                         ?>
                     </td>
                 </tr>
                 <?php
             }
-            echo '</tbody></table>';
-            return ob_get_clean();
         }
 
         public function add_listing_columns($columns) {
