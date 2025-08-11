@@ -127,6 +127,7 @@ class Directory_Admin {
         add_action( 'admin_menu', [ $this, 'add_admin_menu' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_scripts' ] );
+        add_action( 'wp_ajax_wpd_verify_service', [ $this, 'ajax_verify_service' ] );
     }
 
     public function add_admin_menu() {
@@ -271,39 +272,41 @@ class Directory_Admin {
     }
 
     public function sanitize_settings( $input ) {
+        Directory_Main::log("Sanitizing plugin settings...");
         $new_input = [];
-        if (empty($input) || !is_array($input)) return $new_input;
+        if (empty($input) || !is_array($input)) {
+            Directory_Main::log("Settings input is empty or not an array. Returning empty array.");
+            return $new_input;
+        }
         
         foreach ($input as $section => $values) {
             if (is_array($values)) {
                 foreach ($values as $key => $value) {
                     $sanitized_value = null;
-                    // Specific sanitization rules
-                    if ( $section === 'appearance' && strpos($key, '_color') !== false ) {
+                    if ( is_array($value) ) {
+                        $sanitized_value = array_map('sanitize_text_field', $value);
+                    } elseif ( strpos($key, '_color') !== false ) {
                         $sanitized_value = sanitize_hex_color($value);
                     } elseif ( strpos($key, 'email_body_') === 0 ) {
                         $sanitized_value = wp_kses_post($value);
-                    } elseif ( is_array($value) ) {
-                        $sanitized_value = array_map('sanitize_text_field', $value);
+                    } elseif ( strpos($key, 'font_size_') === 0 ) {
+                        $sanitized_value = sanitize_text_field($value); 
+                    } elseif ( in_array($key, ['font_weight_title', 'font_weight_body', 'font_weight_button']) ) {
+                        $sanitized_value = absint($value); 
                     } else {
-                        // Default sanitization
                         $sanitized_value = sanitize_text_field($value);
                     }
                     $new_input[$section][$key] = $sanitized_value;
                 }
             }
         }
+        Directory_Main::log("Settings sanitized successfully.");
         return $new_input;
     }
     
     private function add_general_fields($section_id){
         add_settings_field('general_pages', 'برگه‌های اصلی', [$this, 'render_page_dropdown_fields'], 'wpd_settings_general', $section_id);
         add_settings_field('general_packages_system', 'سیستم بسته‌های عضویت', [$this, 'render_checkbox_element'], 'wpd_settings_general', $section_id, ['section' => 'general', 'id' => 'enable_packages', 'desc' => 'در صورت غیرفعال بودن، مرحله انتخاب بسته حذف شده و از مدل پرداخت به ازای هر آگهی استفاده می‌شود.']);
-        add_settings_field('general_shamsi_calendar', __('فعال‌سازی تقویم شمسی', 'wp-directory'), [$this, 'render_checkbox_element'], 'wpd_settings_general', $section_id, [
-            'section' => 'general', 
-            'id' => 'enable_shamsi_calendar', 
-            'desc' => __('برای عملکرد صحیح، نصب و فعال بودن افزونه <a href="https://wordpress.org/plugins/wp-parsidate/" target="_blank">Parsi Date</a> الزامی است.', 'wp-directory')
-        ]);
         add_settings_field('general_currency', 'واحد پولی', [$this, 'render_text_input_element'], 'wpd_settings_general', $section_id, ['section' => 'general', 'id' => 'currency', 'default' => 'تومان']);
         add_settings_field('general_approval_method', 'روش تایید آگهی', [$this, 'render_select_element'], 'wpd_settings_general', $section_id, [
             'section' => 'general', 
@@ -357,7 +360,13 @@ class Directory_Admin {
                         </tr>
                         <tr>
                             <th><label for="wpd_settings_payments_<?php echo esc_attr($id); ?>_apikey"><?php _e('کلید API / مرچنت کد', 'wp-directory'); ?></label></th>
-                            <td><?php $this->render_text_input_element(['section' => 'payments', 'id' => $id.'_apikey']); ?></td>
+                            <td>
+                                <?php $this->render_text_input_element(['section' => 'payments', 'id' => $id.'_apikey']); ?>
+                                <button type="button" class="button button-secondary wpd-verify-service-btn" data-service="<?php echo esc_attr($id); ?>" data-field-id="wpd_settings_payments_<?php echo esc_attr($id); ?>_apikey">
+                                    <?php _e('بررسی اتصال', 'wp-directory'); ?>
+                                </button>
+                                <span class="wpd-verification-status"></span>
+                            </td>
                         </tr>
                     </table>
                 </div>
@@ -376,11 +385,23 @@ class Directory_Admin {
             </tr>
             <tr class="sms-provider-field kavenegar-field" style="display:none;">
                 <th><label for="wpd_settings_sms_kavenegar_api_key"><?php _e('کلید API کاوه نگار', 'wp-directory'); ?></label></th>
-                <td><?php $this->render_text_input_element(['section' => 'sms', 'id' => 'kavenegar_api_key']); ?></td>
+                <td>
+                    <?php $this->render_text_input_element(['section' => 'sms', 'id' => 'kavenegar_api_key']); ?>
+                    <button type="button" class="button button-secondary wpd-verify-service-btn" data-service="kavenegar" data-field-id="wpd_settings_sms_kavenegar_api_key">
+                        <?php _e('بررسی اتصال', 'wp-directory'); ?>
+                    </button>
+                    <span class="wpd-verification-status"></span>
+                </td>
             </tr>
             <tr class="sms-provider-field farazsms-field" style="display:none;">
                 <th><label for="wpd_settings_sms_farazsms_api_key"><?php _e('کلید API فراز اس ام اس', 'wp-directory'); ?></label></th>
-                <td><?php $this->render_text_input_element(['section' => 'sms', 'id' => 'farazsms_api_key']); ?></td>
+                <td>
+                    <?php $this->render_text_input_element(['section' => 'sms', 'id' => 'farazsms_api_key']); ?>
+                     <button type="button" class="button button-secondary wpd-verify-service-btn" data-service="farazsms" data-field-id="wpd_settings_sms_farazsms_api_key">
+                        <?php _e('بررسی اتصال', 'wp-directory'); ?>
+                    </button>
+                    <span class="wpd-verification-status"></span>
+                </td>
             </tr>
             <tr class="sms-provider-field farazsms-field" style="display:none;">
                 <th><label for="wpd_settings_sms_farazsms_sender_number"><?php _e('شماره فرستنده فراز اس ام اس', 'wp-directory'); ?></label></th>
@@ -543,18 +564,23 @@ class Directory_Admin {
             .wpd-modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 60%; max-width: 700px; position: relative; }
             .wpd-modal-close { color: #aaa; float: left; font-size: 28px; font-weight: bold; cursor: pointer; }
             .wpd-notifications-table .button { margin-right: 5px; }
+            .wpd-verification-status { margin-right: 10px; font-weight: bold; }
+            .wpd-verification-status.success { color: green; }
+            .wpd-verification-status.error { color: red; }
         ";
     }
 
     private function get_settings_page_js() {
-        return "
+        // START OF CHANGE: Fixed JS string parsing issue by using nowdoc syntax
+        $ajax_nonce = wp_create_nonce('wpd_verify_service_nonce');
+        return <<<'JS'
             jQuery(document).ready(function($){
                 // General Tabs
                 var activeTab = window.location.hash.replace('#', '');
-                if (activeTab === '' || $('.wpd-nav-tab-wrapper .nav-tab[data-tab=\"' + activeTab + '\"]').length === 0) {
+                if (activeTab === '' || $('.wpd-nav-tab-wrapper .nav-tab[data-tab="' + activeTab + '"]').length === 0) {
                     activeTab = $('.wpd-nav-tab-wrapper .nav-tab:first').data('tab');
                 }
-                $('.wpd-nav-tab-wrapper .nav-tab[data-tab=\"' + activeTab + '\"]').addClass('nav-tab-active');
+                $('.wpd-nav-tab-wrapper .nav-tab[data-tab="' + activeTab + '"]').addClass('nav-tab-active');
                 $('#tab-' + activeTab).addClass('active');
                 $('.wpd-nav-tab-wrapper .nav-tab').click(function(e){
                     e.preventDefault();
@@ -601,7 +627,83 @@ class Directory_Admin {
                         $(e.target).hide();
                     }
                 });
+
+                // Service Verification AJAX
+                $('.wpd-verify-service-btn').on('click', function(e) {
+                    e.preventDefault();
+                    var $button = $(this);
+                    var service = $button.data('service');
+                    var fieldId = $button.data('field-id');
+                    var apiKey = $('#' + fieldId).val();
+                    var $statusSpan = $button.siblings('.wpd-verification-status');
+
+                    $statusSpan.removeClass('success error').text('در حال بررسی...').css('color', 'orange');
+                    $button.prop('disabled', true);
+
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'wpd_verify_service',
+                            _ajax_nonce: '{$ajax_nonce}',
+                            service: service,
+                            api_key: apiKey
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $statusSpan.addClass('success').text(response.data.message);
+                            } else {
+                                $statusSpan.addClass('error').text(response.data.message);
+                            }
+                        },
+                        error: function() {
+                            $statusSpan.addClass('error').text('خطای ارتباط با سرور.');
+                        },
+                        complete: function() {
+                            $button.prop('disabled', false);
+                        }
+                    });
+                });
             });
-        ";
+JS;
+        // END OF CHANGE
+    }
+
+    public function ajax_verify_service() {
+        check_ajax_referer('wpd_verify_service_nonce');
+
+        if ( ! current_user_can('manage_options') ) {
+            wp_send_json_error(['message' => 'شما دسترسی لازم را ندارید.']);
+        }
+
+        $service = isset($_POST['service']) ? sanitize_key($_POST['service']) : '';
+        $api_key = isset($_POST['api_key']) ? sanitize_text_field($_POST['api_key']) : '';
+
+        if (empty($service) || empty($api_key)) {
+            wp_send_json_error(['message' => 'سرویس یا کلید API مشخص نشده است.']);
+        }
+
+        $result = ['success' => false, 'message' => 'سرویس نامعتبر است.'];
+
+        switch ($service) {
+            case 'zarinpal':
+                $result = Directory_Gateways::verify_zarinpal_credentials($api_key);
+                break;
+            case 'zibal':
+                $result = Directory_Gateways::verify_zibal_credentials($api_key);
+                break;
+            case 'kavenegar':
+                $result = Directory_Gateways::verify_kavenegar_credentials($api_key);
+                break;
+            case 'farazsms':
+                 $result = Directory_Gateways::verify_farazsms_credentials($api_key);
+                break;
+        }
+
+        if ($result['success']) {
+            wp_send_json_success(['message' => $result['message']]);
+        } else {
+            wp_send_json_error(['message' => $result['message']]);
+        }
     }
 }

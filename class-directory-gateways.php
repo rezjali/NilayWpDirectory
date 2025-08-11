@@ -12,13 +12,6 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
             add_action( 'init', [ $this, 'handle_payment_verification' ] );
         }
 
-        /**
-         * شروع فرآیند پرداخت برای یک تراکنش
-         * @param float $amount مبلغ
-         * @param int $transaction_id شناسه تراکنش از جدول ما
-         * @param string $description توضیحات
-         * @param int $listing_id شناسه آگهی
-         */
         public static function process_payment( $amount, $transaction_id, $description, $listing_id ) {
             $dashboard_page_id = Directory_Main::get_option('general', [])['dashboard_page'] ?? 0;
             $redirect_url = $dashboard_page_id ? get_permalink($dashboard_page_id) : home_url();
@@ -35,7 +28,6 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
             } elseif ( !empty($payment_settings['zibal_enable']) ) {
                 self::zibal_request( $amount, $callback_url, $description, $transaction_id );
             } else {
-                // اگر هیچ درگاهی فعال نبود، خطا بده
                 wp_redirect( add_query_arg('wpd_error', 'no_gateway', $redirect_url) );
                 exit;
             }
@@ -49,7 +41,7 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
 
             $data = [
                 'merchant_id'  => $merchant_id,
-                'amount'       => $amount,
+                'amount'       => $amount * 10, // تبدیل به ریال
                 'callback_url' => add_query_arg( 'gateway', 'zarinpal', $callback_url ),
                 'description'  => $description,
             ];
@@ -79,7 +71,7 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
 
             $data = [
                 'merchant'     => $merchant_id,
-                'amount'       => $amount,
+                'amount'       => $amount * 10, // تبدیل به ریال
                 'callbackUrl'  => add_query_arg( 'gateway', 'zibal', $callback_url ),
                 'description'  => $description,
                 'orderId'      => $transaction_id,
@@ -133,7 +125,7 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
             }
 
             $merchant_id = Directory_Main::get_option( 'payments', [] )['zarinpal_apikey'] ?? '';
-            $data = [ 'merchant_id' => $merchant_id, 'amount' => $transaction->amount, 'authority' => $authority ];
+            $data = [ 'merchant_id' => $merchant_id, 'amount' => $transaction->amount * 10, 'authority' => $authority ]; // تبدیل به ریال
             $response = wp_remote_post( 'https://api.zarinpal.com/pg/v4/payment/verify.json', [ 'body' => json_encode( $data ), 'headers' => [ 'Content-Type' => 'application/json' ] ] );
             
             if ( is_wp_error( $response ) ) {
@@ -143,7 +135,7 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
 
             if ( isset($body['data']['code']) && ($body['data']['code'] == 100 || $body['data']['code'] == 101) ) {
                 $ref_id = $body['data']['ref_id'];
-                $wpdb->update( $table_name, [ 'status' => 'completed', 'transaction_id' => $ref_id ], [ 'id' => $transaction_id ] );
+                $wpdb->update( $table_name, [ 'status' => 'completed', 'transaction_id' => $ref_id, 'gateway' => 'zarinpal' ], [ 'id' => $transaction_id ] );
                 
                 self::activate_listing_after_payment( $transaction->listing_id, $transaction->package_id );
                 
@@ -182,7 +174,7 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
 
             if ( isset($body['result']) && $body['result'] == 100 ) {
                 $ref_id = $body['refNumber'];
-                $wpdb->update( $table_name, [ 'status' => 'completed', 'transaction_id' => $ref_id ], [ 'id' => $transaction_id ] );
+                $wpdb->update( $table_name, [ 'status' => 'completed', 'transaction_id' => $ref_id, 'gateway' => 'zibal' ], [ 'id' => $transaction_id ] );
                 
                 self::activate_listing_after_payment( $transaction->listing_id, $transaction->package_id );
                 
@@ -227,7 +219,7 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
         }
 
         private static function kavenegar_send($to, $pattern_code, $vars) {
-            $api_key = Directory_Main::get_option('sms', [])['api_key'] ?? '';
+            $api_key = Directory_Main::get_option('sms', [])['kavenegar_api_key'] ?? '';
             if(empty($api_key)) return;
             
             // کاوه نگار از ارسال متن خام در پترن پشتیبانی می‌کند
@@ -239,8 +231,8 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
         }
 
         private static function farazsms_send($to, $pattern_code, $vars) {
-            $api_key = Directory_Main::get_option('sms', [])['api_key'] ?? '';
-            $sender = Directory_Main::get_option('sms', [])['sender_number'] ?? '';
+            $api_key = Directory_Main::get_option('sms', [])['farazsms_api_key'] ?? '';
+            $sender = Directory_Main::get_option('sms', [])['farazsms_sender_number'] ?? '';
             if(empty($api_key) || empty($sender) || empty($pattern_code)) return;
 
             $input_data = [];
@@ -278,5 +270,98 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
             wp_redirect(add_query_arg('wpd_success', $success_code, $redirect_url));
             exit;
         }
+
+        // START OF CHANGE: New verification functions
+        public static function verify_zarinpal_credentials($api_key) {
+            $response = wp_remote_post('https://api.zarinpal.com/pg/v4/payment/request.json', [
+                'headers' => ['Content-Type' => 'application/json'],
+                'body'    => json_encode([
+                    'merchant_id'  => $api_key,
+                    'amount'       => 10000, // 1000 Toman in Rials
+                    'callback_url' => home_url(),
+                    'description'  => 'تست اتصال افزونه نیلای دایرکتوری',
+                ]),
+            ]);
+
+            if (is_wp_error($response)) {
+                return ['success' => false, 'message' => 'خطا در ارتباط با زرین‌پال: ' . $response->get_error_message()];
+            }
+
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+            $code = $body['errors']['code'] ?? ($body['data']['code'] ?? null);
+
+            if ($code == 100) {
+                return ['success' => true, 'message' => 'اتصال با موفقیت برقرار شد.'];
+            } elseif ($code == -9) { // Invalid Merchant ID
+                return ['success' => false, 'message' => 'مرچنت کد نامعتبر است. (کد خطا: ' . $code . ')'];
+            } else {
+                return ['success' => false, 'message' => 'خطا: ' . ($body['errors']['message'] ?? 'ناشناخته')];
+            }
+        }
+
+        public static function verify_zibal_credentials($api_key) {
+            $response = wp_remote_post('https://gateway.zibal.ir/v1/request', [
+                'headers' => ['Content-Type' => 'application/json'],
+                'body'    => json_encode([
+                    'merchant'     => $api_key,
+                    'amount'       => 10000, // 1000 Toman in Rials
+                    'callbackUrl'  => home_url(),
+                    'description'  => 'تست اتصال افزونه نیلای دایرکتوری',
+                ]),
+            ]);
+
+            if (is_wp_error($response)) {
+                return ['success' => false, 'message' => 'خطا در ارتباط با زیبال: ' . $response->get_error_message()];
+            }
+
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+
+            if (isset($body['result']) && $body['result'] == 100) {
+                return ['success' => true, 'message' => 'اتصال با موفقیت برقرار شد.'];
+            } else {
+                return ['success' => false, 'message' => 'خطا: ' . ($body['message'] ?? 'مرچنت کد نامعتبر است.')];
+            }
+        }
+
+        public static function verify_kavenegar_credentials($api_key) {
+            $url = 'https://api.kavenegar.com/v1/' . $api_key . '/account/info.json';
+            $response = wp_remote_get($url);
+
+            if (is_wp_error($response)) {
+                return ['success' => false, 'message' => 'خطا در ارتباط با کاوه نگار: ' . $response->get_error_message()];
+            }
+
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+            $return_status = $body['return']['status'] ?? 0;
+
+            if ($return_status == 200) {
+                $credit = $body['entries']['remaincredit'] ?? 'نامشخص';
+                return ['success' => true, 'message' => 'اتصال موفق. اعتبار: ' . number_format($credit)];
+            } else {
+                return ['success' => false, 'message' => 'خطا: ' . ($body['return']['message'] ?? 'کلید API نامعتبر است.')];
+            }
+        }
+
+        public static function verify_farazsms_credentials($api_key) {
+             $url = 'http://ippanel.com/api/v1/user/credit';
+             $response = wp_remote_get($url, [
+                'headers' => ['Authorization' => 'AccessKey ' . $api_key]
+             ]);
+
+             if (is_wp_error($response)) {
+                return ['success' => false, 'message' => 'خطا در ارتباط با فراز پیامک: ' . $response->get_error_message()];
+            }
+
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+            $status_code = $body['status']['code'] ?? null;
+
+            if ($status_code == '200') {
+                 $credit = $body['data']['credit'] ?? 'نامشخص';
+                 return ['success' => true, 'message' => 'اتصال موفق. اعتبار: ' . number_format($credit)];
+            } else {
+                 return ['success' => false, 'message' => 'خطا: ' . ($body['status']['message'] ?? 'کلید API نامعتبر است.')];
+            }
+        }
+        // END OF CHANGE
     }
 }

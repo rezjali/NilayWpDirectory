@@ -2,24 +2,7 @@ jQuery(document).ready(function ($) {
 
     /**
      * ------------------------------------------------
-     * 1. فعال‌سازی تقویم شمسی (Jalali Datepicker)
-     * ------------------------------------------------
-     */
-    function initJalaliDatepicker() {
-        // این تابع روی تمام المنت‌هایی که این کلاس را دارند، تقویم را فعال می‌کند
-        $('.wpd-jalali-datepicker').persianDatepicker({
-            format: 'YYYY/MM/DD',
-            autoClose: true,
-            observer: true,
-            initialValue: false
-        });
-    }
-    initJalaliDatepicker();
-
-
-    /**
-     * ------------------------------------------------
-     * 2. بارگذاری فیلدهای سفارشی بر اساس نوع آگهی
+     * 1. بارگذاری فیلدهای سفارشی بر اساس نوع آگهی
      * ------------------------------------------------
      */
     $('#listing_type').on('change', function () {
@@ -46,7 +29,9 @@ jQuery(document).ready(function ($) {
             success: function (response) {
                 if (response.success) {
                     wrapper.html(response.data.html);
-                    initJalaliDatepicker();
+                    // START OF CHANGE: Removed datepicker initialization from frontend
+                    // initJalaliDatepicker();
+                    // END OF CHANGE
                 } else {
                     wrapper.html('<p class="wpd-alert wpd-alert-danger">' + response.data.message + '</p>');
                 }
@@ -60,7 +45,7 @@ jQuery(document).ready(function ($) {
 
     /**
      * ------------------------------------------------
-     * 3. مدیریت تب‌ها در داشبورد کاربری
+     * 2. مدیریت تب‌ها در داشبورد کاربری
      * ------------------------------------------------
      */
     $('.wpd-dashboard-nav a').on('click', function (e) {
@@ -80,7 +65,7 @@ jQuery(document).ready(function ($) {
 
     /**
      * ------------------------------------------------
-     * 4. فیلتر کردن آگهی‌ها با AJAX
+     * 3. فیلتر کردن آگهی‌ها با AJAX
      * ------------------------------------------------
      */
     var filterForm = $('#wpd-filter-form');

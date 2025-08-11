@@ -125,15 +125,27 @@ if ( ! class_exists( 'Directory_Main' ) ) {
         }
 
         /**
-         * بررسی می‌کند که آیا باید از تقویم شمسی استفاده شود یا خیر
-         * @return bool
+         * START OF CHANGE: New logging function.
+         * تابع مرکزی برای ثبت لاگ در فایل debug.log وردپرس
+         *
+         * @param string|array|object $message پیامی که باید لاگ شود
          */
-        public static function is_shamsi_calendar_enabled() {
-            $general_settings = self::get_option('general', ['enable_shamsi_calendar' => 0]);
-            // START OF CHANGE: Removed dependency check for any external plugin.
-            return (bool) $general_settings['enable_shamsi_calendar'];
-            // END OF CHANGE
+        public static function log( $message ) {
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG === true && defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG === true ) {
+                if ( is_array( $message ) || is_object( $message ) ) {
+                    error_log( 'WPD Log: ' . print_r( $message, true ) );
+                } else {
+                    error_log( 'WPD Log: ' . $message );
+                }
+            }
         }
+        // END OF CHANGE
+
+        /**
+         * START OF CHANGE: Removed is_shamsi_calendar_enabled() function.
+         * The plugin now exclusively uses the Shamsi calendar.
+         */
+        // END OF CHANGE
 
         /**
          * لیست کامل اصطلاحات پیش‌فرض افزونه
