@@ -7,14 +7,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! class_exists( 'Directory_Frontend' ) ) {
 
     class Directory_Frontend {
+        
+        // START OF CHANGE: Add a property to store errors
+        private $errors;
+        // END OF CHANGE
 
         public function __construct() {
+            // START OF CHANGE: Initialize errors array
+            $this->errors = new WP_Error();
+            // END OF CHANGE
             add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
             add_action( 'init', [ $this, 'register_shortcodes' ] );
             add_action( 'template_redirect', [ $this, 'handle_form_submission' ] );
             add_action( 'template_redirect', [ $this, 'handle_listing_actions' ] );
             
-            // ثبت پاسخگوهای ایجکس
             add_action( 'wp_ajax_wpd_load_custom_fields', [ $this, 'ajax_load_custom_fields' ] );
             add_action( 'wp_ajax_nopriv_wpd_filter_listings', [ $this, 'ajax_filter_listings' ] );
             add_action( 'wp_ajax_wpd_filter_listings', [ $this, 'ajax_filter_listings' ] );
@@ -29,9 +35,13 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
             }
 
             wp_enqueue_script( 'wpd-main-script', WPD_ASSETS_URL . 'js/main.js', [ 'jquery' ], WPD_PLUGIN_VERSION, true );
-            wp_enqueue_style( 'persian-datepicker-style', 'https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css' );
-            wp_enqueue_script( 'persian-date', 'https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js', [], null, true );
-            wp_enqueue_script( 'persian-datepicker-script', 'https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js', [ 'jquery', 'persian-date' ], null, true );
+            
+            // START OF CHANGE: No longer needed as date fields are removed from frontend logic for now
+            // wp_enqueue_style( 'persian-datepicker-style', 'https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css' );
+            // wp_enqueue_script( 'persian-date', 'https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js', [], null, true );
+            // wp_enqueue_script( 'persian-datepicker-script', 'https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js', [ 'jquery', 'persian-date' ], null, true );
+            // END OF CHANGE
+
             wp_localize_script( 'wpd-main-script', 'wpd_ajax_obj', [
                 'ajax_url' => admin_url( 'admin-ajax.php' ),
                 'nonce'    => wp_create_nonce( 'wpd_ajax_nonce' ),
@@ -53,6 +63,21 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
             $packages_enabled = !empty($general_settings['enable_packages']);
 
             ob_start();
+
+            // START OF CHANGE: Display validation errors
+            if ( isset( $_GET['wpd_form_error'] ) && ! empty( $_SESSION['wpd_form_errors'] ) ) {
+                $errors = $_SESSION['wpd_form_errors'];
+                if ( is_wp_error( $errors ) ) {
+                    echo '<div class="wpd-alert wpd-alert-danger">';
+                    foreach ( $errors->get_error_messages() as $error ) {
+                        echo '<p>' . esc_html( $error ) . '</p>';
+                    }
+                    echo '</div>';
+                }
+                unset( $_SESSION['wpd_form_errors'] );
+            }
+            // END OF CHANGE
+
             $listing_id = isset( $_GET['listing_id'] ) ? intval( $_GET['listing_id'] ) : 0;
 
             // حالت ویرایش آگهی
@@ -169,20 +194,34 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
                 return;
             }
 
+            // START OF CHANGE: Major rewrite of submission handling to include validation
+            
+            $listing_id = isset( $_POST['listing_id'] ) ? intval( $_POST['listing_id'] ) : 0;
+            $package_id = isset( $_POST['package_id'] ) ? intval( $_POST['package_id'] ) : 0;
+            $listing_type_id = isset( $_POST['listing_type'] ) ? intval( $_POST['listing_type'] ) : 0;
+            $form_data = $_POST;
+
+            // 1. Validate the form data
+            $this->validate_form_data( $listing_type_id, $form_data, $listing_id );
+
+            // 2. Check for errors
+            if ( $this->errors->has_errors() ) {
+                // Store errors in session to display after redirect
+                if ( ! session_id() ) {
+                    session_start();
+                }
+                $_SESSION['wpd_form_errors'] = $this->errors;
+                
+                // Redirect back to the form with an error flag
+                wp_safe_redirect( add_query_arg( 'wpd_form_error', '1', wp_get_referer() ) );
+                exit;
+            }
+
+            // 3. If validation passes, proceed with saving
             $general_settings = Directory_Main::get_option('general', []);
             $approval_method = $general_settings['approval_method'] ?? 'manual';
             $packages_enabled = !empty($general_settings['enable_packages']);
             $dashboard_page_url = get_permalink($general_settings['dashboard_page'] ?? 0);
-
-            $listing_id = isset( $_POST['listing_id'] ) ? intval( $_POST['listing_id'] ) : 0;
-            $package_id = isset( $_POST['package_id'] ) ? intval( $_POST['package_id'] ) : 0;
-            $listing_type_id = isset( $_POST['listing_type'] ) ? intval( $_POST['listing_type'] ) : 0;
-
-            // اگر نوع آگهی انتخاب نشده بود، خطا بده
-            if (empty($listing_type_id)) {
-                wp_redirect(add_query_arg('wpd_error', 'لطفا نوع آگهی را انتخاب کنید', $_SERVER['HTTP_REFERER']));
-                exit;
-            }
 
             // محاسبه هزینه نهایی
             $total_cost = 0;
@@ -192,8 +231,8 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
 
             // ایجاد یا بروزرسانی پست آگهی
             $post_data = [
-                'post_title'   => sanitize_text_field( $_POST['listing_title'] ),
-                'post_content' => wp_kses_post( $_POST['listing_description'] ),
+                'post_title'   => sanitize_text_field( $form_data['listing_title'] ),
+                'post_content' => wp_kses_post( $form_data['listing_description'] ),
                 'post_author'  => get_current_user_id(),
                 'post_type'    => 'wpd_listing',
             ];
@@ -207,7 +246,7 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
             }
 
             if ( is_wp_error( $listing_id ) ) {
-                wp_redirect(add_query_arg('wpd_error', $listing_id->get_error_message(), $_SERVER['HTTP_REFERER']));
+                wp_redirect(add_query_arg('wpd_error', $listing_id->get_error_message(), wp_get_referer()));
                 exit;
             }
 
@@ -254,6 +293,7 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
                 wp_redirect(add_query_arg('wpd_success', 'آگهی شما با موفقیت ثبت شد.', $dashboard_page_url));
             }
             exit;
+            // END OF CHANGE
         }
         
         public function handle_listing_actions() { /* ... کد قبلی بدون تغییر ... */ }
@@ -317,5 +357,102 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
 
             return $css;
         }
+
+        // START OF CHANGE: New validation functions
+        private function validate_form_data( $listing_type_id, $form_data, $listing_id = 0 ) {
+            if ( empty( $listing_type_id ) ) {
+                $this->errors->add( 'no_listing_type', 'لطفا نوع آگهی را انتخاب کنید.' );
+                return;
+            }
+    
+            $fields = get_post_meta( $listing_type_id, '_wpd_custom_fields', true );
+            if ( ! is_array( $fields ) ) {
+                return;
+            }
+    
+            $custom_data = $form_data['wpd_custom'] ?? [];
+    
+            foreach ( $fields as $field ) {
+                // Skip validation for structural fields
+                if ( in_array( $field['type'], ['section_title', 'html_content'] ) ) {
+                    continue;
+                }
+
+                // 1. Check if the field should be visible based on conditional logic
+                if ( ! $this->is_field_visible( $field, $custom_data ) ) {
+                    continue; // Skip validation for hidden fields
+                }
+    
+                $value = $custom_data[ $field['key'] ] ?? null;
+    
+                // 2. Check for required fields
+                if ( ! empty( $field['required'] ) && empty( $value ) ) {
+                    $this->errors->add( 'field_required', sprintf( 'فیلد "%s" الزامی است.', $field['label'] ) );
+                    continue; // No need for further validation if it's empty
+                }
+    
+                // 3. Check for unique fields
+                if ( ! empty( $field['unique'] ) && ! empty( $value ) ) {
+                    if ( $this->is_value_duplicate( $field['key'], $value, $listing_id ) ) {
+                        $this->errors->add( 'field_unique', sprintf( 'مقدار وارد شده برای "%s" قبلاً استفاده شده است.', $field['label'] ) );
+                    }
+                }
+            }
+        }
+    
+        private function is_field_visible( $field, $custom_data ) {
+            if ( empty( $field['conditional_logic']['enabled'] ) ) {
+                return true; // Always visible if no logic is set
+            }
+    
+            $logic = $field['conditional_logic'];
+            $target_value = $custom_data[ $logic['target_field'] ] ?? null;
+    
+            $condition_met = false;
+            switch ( $logic['operator'] ) {
+                case 'is':
+                    $condition_met = ( $target_value == $logic['value'] );
+                    break;
+                case 'is_not':
+                    $condition_met = ( $target_value != $logic['value'] );
+                    break;
+                case 'is_empty':
+                    $condition_met = empty( $target_value );
+                    break;
+                case 'is_not_empty':
+                    $condition_met = ! empty( $target_value );
+                    break;
+            }
+    
+            return ( $logic['action'] === 'show' ) ? $condition_met : ! $condition_met;
+        }
+    
+        private function is_value_duplicate( $meta_key, $meta_value, $exclude_post_id = 0 ) {
+            global $wpdb;
+            $meta_key_prefixed = '_wpd_' . sanitize_key( $meta_key );
+    
+            $query = $wpdb->prepare(
+                "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value = %s",
+                $meta_key_prefixed,
+                $meta_value
+            );
+    
+            $results = $wpdb->get_col( $query );
+    
+            if ( empty( $results ) ) {
+                return false;
+            }
+    
+            // If we are editing a post, we should exclude it from the check
+            if ( $exclude_post_id > 0 ) {
+                $filtered_results = array_filter( $results, function ( $post_id ) use ( $exclude_post_id ) {
+                    return $post_id != $exclude_post_id;
+                } );
+                return ! empty( $filtered_results );
+            }
+    
+            return true;
+        }
+        // END OF CHANGE
     }
 }

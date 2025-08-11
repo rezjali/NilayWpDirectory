@@ -397,7 +397,7 @@ class Directory_Admin {
                 <th><label for="wpd_settings_sms_farazsms_api_key"><?php _e('کلید API فراز اس ام اس', 'wp-directory'); ?></label></th>
                 <td>
                     <?php $this->render_text_input_element(['section' => 'sms', 'id' => 'farazsms_api_key']); ?>
-                     <button type="button" class="button button-secondary wpd-verify-service-btn" data-service="farazsms" data-field-id="wpd_settings_sms_farazsms_api_key">
+                     <button type="button" class="button button-secondary wpd-verify-service-btn" data-service="farazsms" data-field-id="wpd_settings_sms_farazsms_api_key" data-extra-field-id="wpd_settings_sms_farazsms_sender_number">
                         <?php _e('بررسی اتصال', 'wp-directory'); ?>
                     </button>
                     <span class="wpd-verification-status"></span>
@@ -571,7 +571,6 @@ class Directory_Admin {
     }
 
     private function get_settings_page_js() {
-        // START OF CHANGE: Fixed JS string parsing issue by using nowdoc syntax
         $ajax_nonce = wp_create_nonce('wpd_verify_service_nonce');
         return <<<'JS'
             jQuery(document).ready(function($){
@@ -634,7 +633,9 @@ class Directory_Admin {
                     var $button = $(this);
                     var service = $button.data('service');
                     var fieldId = $button.data('field-id');
+                    var extraFieldId = $button.data('extra-field-id');
                     var apiKey = $('#' + fieldId).val();
+                    var extraData = extraFieldId ? $('#' + extraFieldId).val() : '';
                     var $statusSpan = $button.siblings('.wpd-verification-status');
 
                     $statusSpan.removeClass('success error').text('در حال بررسی...').css('color', 'orange');
@@ -647,7 +648,8 @@ class Directory_Admin {
                             action: 'wpd_verify_service',
                             _ajax_nonce: '{$ajax_nonce}',
                             service: service,
-                            api_key: apiKey
+                            api_key: apiKey,
+                            extra_data: extraData
                         },
                         success: function(response) {
                             if (response.success) {
@@ -666,7 +668,6 @@ class Directory_Admin {
                 });
             });
 JS;
-        // END OF CHANGE
     }
 
     public function ajax_verify_service() {
@@ -678,6 +679,8 @@ JS;
 
         $service = isset($_POST['service']) ? sanitize_key($_POST['service']) : '';
         $api_key = isset($_POST['api_key']) ? sanitize_text_field($_POST['api_key']) : '';
+        $extra_data = isset($_POST['extra_data']) ? sanitize_text_field($_POST['extra_data']) : '';
+
 
         if (empty($service) || empty($api_key)) {
             wp_send_json_error(['message' => 'سرویس یا کلید API مشخص نشده است.']);
@@ -696,7 +699,7 @@ JS;
                 $result = Directory_Gateways::verify_kavenegar_credentials($api_key);
                 break;
             case 'farazsms':
-                 $result = Directory_Gateways::verify_farazsms_credentials($api_key);
+                 $result = Directory_Gateways::verify_farazsms_credentials($api_key, $extra_data);
                 break;
         }
 

@@ -260,7 +260,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             <div id="wpd-field-builder-wrapper">
                 <div id="wpd-fields-container" class="wpd-sortable-list">
                     <?php if ( ! empty( $fields ) ) : foreach ( $fields as $index => $field ) : ?>
-                        <?php $this->render_field_builder_row($index, $field); ?>
+                        <?php $this->render_field_builder_row($index, $field, $fields); ?>
                     <?php endforeach; endif; ?>
                 </div>
                 <a href="#" id="wpd-add-field" class="button button-primary"><?php _e( 'افزودن فیلد جدید', 'wp-directory' ); ?></a>
@@ -268,17 +268,29 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             <?php
         }
 
-        private function render_field_builder_row($index, $field_data = []) {
+        private function render_field_builder_row($index, $field_data = [], $all_fields = []) {
             $label = $field_data['label'] ?? '';
             $key = $field_data['key'] ?? '';
             $type = $field_data['type'] ?? 'text';
             $options = $field_data['options'] ?? '';
             $sub_fields = $field_data['sub_fields'] ?? [];
+            $required = $field_data['required'] ?? 0;
+            $unique = $field_data['unique'] ?? 0;
+            $width_class = $field_data['width_class'] ?? 'full';
+            $conditional_logic = wp_parse_args($field_data['conditional_logic'] ?? [], [
+                'enabled'      => 0,
+                'action'       => 'show',
+                'target_field' => '',
+                'operator'     => 'is',
+                'value'        => '',
+            ]);
+            $address_settings = $field_data['address_settings'] ?? [];
+            $identity_settings = $field_data['identity_settings'] ?? [];
             ?>
-            <div class="wpd-field-row" data-index="<?php echo esc_attr($index); ?>">
+            <div class="wpd-field-row" data-index="<?php echo esc_attr($index); ?>" data-field-key="<?php echo esc_attr($key); ?>">
                 <div class="wpd-field-header">
                     <span class="dashicons dashicons-move handle"></span>
-                    <strong><?php echo esc_html($label) ?: __('فیلد جدید', 'wp-directory'); ?></strong> (<?php echo esc_html($type); ?>)
+                    <strong><?php echo esc_html($label) ?: __('فیلد جدید', 'wp-directory'); ?></strong> (<span class="wpd-field-type-display"><?php echo esc_html($type); ?></span>)
                     <a href="#" class="wpd-toggle-field-details"><?php _e('جزئیات', 'wp-directory'); ?></a>
                 </div>
                 <div class="wpd-field-details" style="display:none;">
@@ -314,16 +326,117 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 <option value="gallery" <?php selected( $type, 'gallery' ); ?>><?php _e( 'گالری تصاویر', 'wp-directory' ); ?></option>
                                 <option value="map" <?php selected( $type, 'map' ); ?>><?php _e( 'نقشه', 'wp-directory' ); ?></option>
                                 <option value="repeater" <?php selected( $type, 'repeater' ); ?>><?php _e( 'تکرار شونده', 'wp-directory' ); ?></option>
+                                <option value="social_networks" <?php selected( $type, 'social_networks' ); ?>><?php _e( 'لیست شبکه‌های اجتماعی', 'wp-directory' ); ?></option>
+                                <option value="simple_list" <?php selected( $type, 'simple_list' ); ?>><?php _e( 'فیلد لیستی', 'wp-directory' ); ?></option>
+                            </optgroup>
+                            <optgroup label="<?php _e('فیلدهای ترکیبی', 'wp-directory'); ?>">
+                                <option value="address" <?php selected( $type, 'address' ); ?>><?php _e( 'آدرس پستی', 'wp-directory' ); ?></option>
+                                <option value="identity" <?php selected( $type, 'identity' ); ?>><?php _e( 'اطلاعات هویتی', 'wp-directory' ); ?></option>
                             </optgroup>
                         </select>
                         <textarea name="wpd_fields[<?php echo esc_attr($index); ?>][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما) یا محتوای HTML', 'wp-directory' ); ?>" style="<?php echo in_array($type, ['select', 'multiselect', 'checkbox', 'radio', 'html_content']) ? '' : 'display:none;'; ?>"><?php echo esc_textarea($options); ?></textarea>
+                    </div>
+
+                    <div class="wpd-field-rules">
+                        <h4><?php _e('تنظیمات نمایش', 'wp-directory'); ?></h4>
+                        <label>
+                            <?php _e('عرض فیلد:', 'wp-directory'); ?>
+                            <select name="wpd_fields[<?php echo esc_attr($index); ?>][width_class]">
+                                <option value="full" <?php selected('full', $width_class); ?>><?php _e('عرض کامل', 'wp-directory'); ?></option>
+                                <option value="half" <?php selected('half', $width_class); ?>><?php _e('یک دوم', 'wp-directory'); ?></option>
+                                <option value="third" <?php selected('third', $width_class); ?>><?php _e('یک سوم', 'wp-directory'); ?></option>
+                                <option value="quarter" <?php selected('quarter', $width_class); ?>><?php _e('یک چهارم', 'wp-directory'); ?></option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="wpd-field-settings-panel wpd-address-settings" style="<?php echo ($type === 'address') ? '' : 'display:none;'; ?>">
+                        <h4><?php _e('تنظیمات فیلد آدرس', 'wp-directory'); ?></h4>
+                        <?php
+                        $address_sub_fields = ['province' => 'استان', 'city' => 'شهر', 'street' => 'آدرس دقیق', 'postal_code' => 'کد پستی'];
+                        foreach ($address_sub_fields as $sub_key => $sub_label) {
+                            $sub_settings = $address_settings[$sub_key] ?? ['enabled' => 1, 'width' => 'full'];
+                            echo '<div class="wpd-compound-sub-field-setting">';
+                            echo '<label><input type="checkbox" name="wpd_fields['.esc_attr($index).'][address_settings]['.$sub_key.'][enabled]" value="1" ' . checked(1, $sub_settings['enabled'], false) . '> '.esc_html($sub_label).'</label>';
+                            echo '<select name="wpd_fields['.esc_attr($index).'][address_settings]['.$sub_key.'][width]">';
+                            echo '<option value="full" '.selected('full', $sub_settings['width'], false).'>عرض کامل</option>';
+                            echo '<option value="half" '.selected('half', $sub_settings['width'], false).'>یک دوم</option>';
+                            echo '<option value="third" '.selected('third', $sub_settings['width'], false).'>یک سوم</option>';
+                            echo '<option value="quarter" '.selected('quarter', $sub_settings['width'], false).'>یک چهارم</option>';
+                            echo '</select>';
+                            echo '</div>';
+                        }
+                        ?>
+                    </div>
+                    <div class="wpd-field-settings-panel wpd-identity-settings" style="<?php echo ($type === 'identity') ? '' : 'display:none;'; ?>">
+                        <h4><?php _e('تنظیمات فیلد اطلاعات هویتی', 'wp-directory'); ?></h4>
+                        <?php
+                        $identity_sub_fields = ['first_name' => 'نام', 'last_name' => 'نام خانوادگی', 'phone' => 'شماره تماس', 'national_id' => 'کد ملی', 'age' => 'سن', 'gender' => 'جنسیت', 'address' => 'آدرس پستی', 'postal_code' => 'کد پستی'];
+                        foreach ($identity_sub_fields as $sub_key => $sub_label) {
+                            $sub_settings = $identity_settings[$sub_key] ?? ['enabled' => 1, 'width' => 'full'];
+                            echo '<div class="wpd-compound-sub-field-setting">';
+                            echo '<label><input type="checkbox" name="wpd_fields['.esc_attr($index).'][identity_settings]['.$sub_key.'][enabled]" value="1" ' . checked(1, $sub_settings['enabled'], false) . '> '.esc_html($sub_label).'</label>';
+                            echo '<select name="wpd_fields['.esc_attr($index).'][identity_settings]['.$sub_key.'][width]">';
+                            echo '<option value="full" '.selected('full', $sub_settings['width'], false).'>عرض کامل</option>';
+                            echo '<option value="half" '.selected('half', $sub_settings['width'], false).'>یک دوم</option>';
+                            echo '<option value="third" '.selected('third', $sub_settings['width'], false).'>یک سوم</option>';
+                            echo '<option value="quarter" '.selected('quarter', $sub_settings['width'], false).'>یک چهارم</option>';
+                            echo '</select>';
+                            echo '</div>';
+                        }
+                        ?>
+                    </div>
+
+                    <div class="wpd-field-rules">
+                        <h4><?php _e('قوانین اعتبارسنجی', 'wp-directory'); ?></h4>
+                        <label>
+                            <input type="checkbox" name="wpd_fields[<?php echo esc_attr($index); ?>][required]" value="1" <?php checked(1, $required); ?>>
+                            <?php _e('الزامی', 'wp-directory'); ?>
+                        </label>
+                        <label style="margin-right: 15px;">
+                            <input type="checkbox" name="wpd_fields[<?php echo esc_attr($index); ?>][unique]" value="1" <?php checked(1, $unique); ?>>
+                            <?php _e('مقدار یکتا', 'wp-directory'); ?>
+                        </label>
+                    </div>
+
+                    <div class="wpd-field-rules wpd-conditional-logic-wrapper">
+                        <h4><?php _e('منطق شرطی', 'wp-directory'); ?></h4>
+                        <label>
+                            <input type="checkbox" class="wpd-conditional-enable" name="wpd_fields[<?php echo esc_attr($index); ?>][conditional_logic][enabled]" value="1" <?php checked(1, $conditional_logic['enabled']); ?>>
+                            <?php _e('فعال کردن منطق شرطی', 'wp-directory'); ?>
+                        </label>
+                        <div class="wpd-conditional-rules" style="<?php echo $conditional_logic['enabled'] ? '' : 'display:none;'; ?>">
+                            <select name="wpd_fields[<?php echo esc_attr($index); ?>][conditional_logic][action]">
+                                <option value="show" <?php selected('show', $conditional_logic['action']); ?>><?php _e('نمایش بده', 'wp-directory'); ?></option>
+                                <option value="hide" <?php selected('hide', $conditional_logic['action']); ?>><?php _e('پنهان کن', 'wp-directory'); ?></option>
+                            </select>
+                            <?php _e('این فیلد را اگر', 'wp-directory'); ?>
+                            <select class="wpd-conditional-target-field" name="wpd_fields[<?php echo esc_attr($index); ?>][conditional_logic][target_field]">
+                                <option value=""><?php _e('یک فیلد انتخاب کنید', 'wp-directory'); ?></option>
+                                <?php
+                                if (!empty($all_fields)) {
+                                    foreach ($all_fields as $other_field) {
+                                        if (empty($other_field['key']) || $other_field['key'] === $key) continue;
+                                        echo '<option value="' . esc_attr($other_field['key']) . '" ' . selected($other_field['key'], $conditional_logic['target_field'], false) . '>' . esc_html($other_field['label']) . '</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                            <select name="wpd_fields[<?php echo esc_attr($index); ?>][conditional_logic][operator]">
+                                <option value="is" <?php selected('is', $conditional_logic['operator']); ?>><?php _e('برابر باشد با', 'wp-directory'); ?></option>
+                                <option value="is_not" <?php selected('is_not', $conditional_logic['operator']); ?>><?php _e('برابر نباشد با', 'wp-directory'); ?></option>
+                                <option value="is_empty" <?php selected('is_empty', $conditional_logic['operator']); ?>><?php _e('خالی باشد', 'wp-directory'); ?></option>
+                                <option value="is_not_empty" <?php selected('is_not_empty', $conditional_logic['operator']); ?>><?php _e('خالی نباشد', 'wp-directory'); ?></option>
+                            </select>
+                            <input type="text" name="wpd_fields[<?php echo esc_attr($index); ?>][conditional_logic][value]" value="<?php echo esc_attr($conditional_logic['value']); ?>" placeholder="<?php _e('مقدار', 'wp-directory'); ?>" style="<?php echo in_array($conditional_logic['operator'], ['is_empty', 'is_not_empty']) ? 'display:none;' : ''; ?>">
+                        </div>
                     </div>
 
                     <div class="wpd-repeater-fields-wrapper" style="<?php echo ($type === 'repeater') ? '' : 'display:none;'; ?>">
                         <h4><?php _e('فیلدهای داخلی تکرارشونده', 'wp-directory'); ?></h4>
                         <div class="wpd-sortable-list wpd-repeater-sub-fields">
                             <?php if (!empty($sub_fields)): foreach($sub_fields as $sub_index => $sub_field): ?>
-                                <?php $this->render_field_builder_row($index . '][sub_fields][' . $sub_index, $sub_field); ?>
+                                <?php $this->render_field_builder_row($index . '][sub_fields][' . $sub_index, $sub_field, $sub_fields); ?>
                             <?php endforeach; endif; ?>
                         </div>
                         <a href="#" class="button wpd-add-sub-field"><?php _e('افزودن فیلد داخلی', 'wp-directory'); ?></a>
@@ -430,12 +543,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( isset( $_POST['wpd_field_builder_nonce'] ) && wp_verify_nonce( $_POST['wpd_field_builder_nonce'], 'wpd_save_field_builder_meta' ) ) {
                 $sanitized_fields = [];
                 if ( isset( $_POST['wpd_fields'] ) && is_array($_POST['wpd_fields']) ) {
-                    // START OF CHANGE: Prevent duplicate meta keys
                     $keys = [];
                     $has_duplicates = false;
                     $fields_to_process = $_POST['wpd_fields'];
                     
-                    // Recursive function to find all keys
                     $find_keys = function($fields_array) use (&$keys, &$has_duplicates, &$find_keys) {
                         foreach ($fields_array as $field) {
                             if (isset($field['key']) && !empty($field['key'])) {
@@ -456,7 +567,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         add_settings_error('wpd_fields', 'duplicate_keys', 'خطا: کلیدهای متا تکراری یافت شد. لطفاً کلیدهای متا را منحصر به فرد کنید.', 'error');
                         return;
                     }
-                    // END OF CHANGE
                     
                     $sanitized_fields = $this->sanitize_field_builder_data($_POST['wpd_fields']);
                 }
@@ -469,7 +579,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     $sanitized_taxs = [];
                     foreach ( $_POST['wpd_taxonomies'] as $tax ) {
                         if ( ! empty( $tax['name'] ) && ! empty( $tax['slug'] ) ) {
-                            $sanitized_taxs[] = [ 'name' => sanitize_text_field( $tax['name'] ), 'slug' => sanitize_key( $tax['slug'] ), 'hierarchical' => intval( $tax['hierarchical'] ) ];
+                            // START OF CHANGE: Sanitize slug for URL-friendliness
+                            $sanitized_taxs[] = [ 'name' => sanitize_text_field( $tax['name'] ), 'slug' => sanitize_title( $tax['slug'] ), 'hierarchical' => intval( $tax['hierarchical'] ) ];
+                            // END OF CHANGE
                         }
                     }
                     update_post_meta( $post_id, '_defined_taxonomies', $sanitized_taxs );
@@ -491,7 +603,39 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     'key'     => sanitize_key($field['key']),
                     'type'    => sanitize_text_field($field['type']),
                     'options' => sanitize_textarea_field($field['options']),
+                    'required' => isset($field['required']) ? 1 : 0,
+                    'unique'   => isset($field['unique']) ? 1 : 0,
+                    'width_class' => isset($field['width_class']) ? sanitize_key($field['width_class']) : 'full',
                 ];
+
+                if (isset($field['conditional_logic']['enabled'])) {
+                    $sanitized_field['conditional_logic'] = [
+                        'enabled'      => 1,
+                        'action'       => sanitize_text_field($field['conditional_logic']['action']),
+                        'target_field' => sanitize_key($field['conditional_logic']['target_field']),
+                        'operator'     => sanitize_text_field($field['conditional_logic']['operator']),
+                        'value'        => sanitize_text_field($field['conditional_logic']['value']),
+                    ];
+                } else {
+                    $sanitized_field['conditional_logic'] = ['enabled' => 0];
+                }
+
+                if (isset($field['address_settings']) && is_array($field['address_settings'])) {
+                    foreach ($field['address_settings'] as $sub_key => $sub_settings) {
+                        $sanitized_field['address_settings'][sanitize_key($sub_key)] = [
+                            'enabled' => isset($sub_settings['enabled']) ? 1 : 0,
+                            'width'   => isset($sub_settings['width']) ? sanitize_key($sub_settings['width']) : 'full',
+                        ];
+                    }
+                }
+                if (isset($field['identity_settings']) && is_array($field['identity_settings'])) {
+                     foreach ($field['identity_settings'] as $sub_key => $sub_settings) {
+                        $sanitized_field['identity_settings'][sanitize_key($sub_key)] = [
+                            'enabled' => isset($sub_settings['enabled']) ? 1 : 0,
+                            'width'   => isset($sub_settings['width']) ? sanitize_key($sub_settings['width']) : 'full',
+                        ];
+                    }
+                }
 
                 if ($sanitized_field['type'] === 'repeater' && !empty($field['sub_fields']) && is_array($field['sub_fields'])) {
                     $sanitized_field['sub_fields'] = $this->sanitize_field_builder_data($field['sub_fields']);
@@ -537,30 +681,36 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     continue;
                 }
 
-                // START OF CHANGE: Repeater save logic fixed
-                if ($field_def['type'] === 'repeater') {
+                if (in_array($field_def['type'], ['repeater', 'social_networks', 'simple_list'])) {
                     $repeater_data = [];
-                    if (is_array($posted_value) && !empty($field_def['sub_fields'])) {
-                        // Re-index array to ensure clean keys
+                    if (is_array($posted_value)) {
                         $posted_value = array_values($posted_value);
                         foreach ($posted_value as $index => $row_data) {
-                            if ($index === '__INDEX__') continue; // Skip template row
+                            if ($index === '__INDEX__') continue;
                             
                             $sanitized_row = [];
-                            foreach ($field_def['sub_fields'] as $sub_field_def) {
-                                $sub_field_key = $sub_field_def['key'];
-                                if (isset($row_data[$sub_field_key])) {
-                                    $sanitized_row[$sub_field_key] = $this->sanitize_field_value($row_data[$sub_field_key], $sub_field_def['type']);
+                            if ($field_def['type'] === 'repeater' && !empty($field_def['sub_fields'])) {
+                                foreach ($field_def['sub_fields'] as $sub_field_def) {
+                                    $sub_field_key = $sub_field_def['key'];
+                                    if (isset($row_data[$sub_field_key])) {
+                                        $sanitized_row[$sub_field_key] = $this->sanitize_field_value($row_data[$sub_field_key], $sub_field_def['type']);
+                                    }
                                 }
+                            } else { 
+                                $sanitized_row = array_map('sanitize_text_field', $row_data);
                             }
-                            if (!empty($sanitized_row)) {
+
+                            if (!empty(array_filter($sanitized_row))) {
                                 $repeater_data[] = $sanitized_row;
                             }
                         }
                     }
                     update_post_meta($post_id, $meta_key, $repeater_data);
-                // END OF CHANGE
-                } else {
+                } elseif (in_array($field_def['type'], ['address', 'identity'])) {
+                    $sanitized_value = is_array($posted_value) ? array_map('sanitize_text_field', $posted_value) : sanitize_text_field($posted_value);
+                    update_post_meta($post_id, $meta_key, $sanitized_value);
+                }
+                else {
                     $sanitized_value = $this->sanitize_field_value($posted_value, $field_def['type']);
                     update_post_meta($post_id, $meta_key, $sanitized_value);
                 }
@@ -637,33 +787,26 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     .wpd-field-header .handle { cursor: move; color: #888; }
                     .wpd-field-header .wpd-toggle-field-details { margin-left: auto; text-decoration: none; }
                     .wpd-field-details { padding: 10px; border-top: 1px solid #ddd; }
-                    .wpd-field-inputs { display: flex; flex-wrap: wrap; gap: 10px; }
+                    .wpd-field-inputs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
                     .wpd-field-inputs input, .wpd-field-inputs select, .wpd-field-inputs textarea { margin: 0; }
                     .wpd-field-options { width: 100%; height: 60px; }
                     .wpd-repeater-fields-wrapper { padding: 10px; margin-top: 10px; border: 1px dashed #ccc; background: #fff; }
                     .wpd-repeater-sub-fields .wpd-field-row { border-style: dashed; }
                     .wpd-field-key-error { border-color: red !important; }
+                    .wpd-field-rules, .wpd-field-settings-panel { padding: 10px; margin-top: 10px; border: 1px solid #e0e0e0; background: #fff; }
+                    .wpd-conditional-rules { padding-top: 10px; margin-top: 10px; border-top: 1px dashed #ccc; }
+                    .wpd-conditional-rules select, .wpd-conditional-rules input { vertical-align: middle; }
+                    .wpd-compound-sub-field-setting { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
                         function toggleOptionsField(element) {
                             var fieldType = $(element).val();
-                            var optionsTextarea = $(element).closest('.wpd-field-inputs').find('.wpd-field-options');
-                            if (['select', 'multiselect', 'checkbox', 'radio', 'html_content'].includes(fieldType)) {
-                                optionsTextarea.show();
-                            } else {
-                                optionsTextarea.hide();
-                            }
-                        }
-
-                        function toggleRepeaterFields(element) {
-                            var fieldType = $(element).val();
-                            var repeaterWrapper = $(element).closest('.wpd-field-details').find('.wpd-repeater-fields-wrapper');
-                            if (fieldType === 'repeater') {
-                                repeaterWrapper.show();
-                            } else {
-                                repeaterWrapper.hide();
-                            }
+                            var $details = $(element).closest('.wpd-field-details');
+                            $details.find('.wpd-field-options').toggle(['select', 'multiselect', 'checkbox', 'radio', 'html_content'].includes(fieldType));
+                            $details.find('.wpd-repeater-fields-wrapper').toggle(fieldType === 'repeater');
+                            $details.find('.wpd-address-settings').toggle(fieldType === 'address');
+                            $details.find('.wpd-identity-settings').toggle(fieldType === 'identity');
                         }
 
                         function initSortable() {
@@ -678,9 +821,35 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         }
                         initSortable();
 
+                        function updateConditionalFieldDropdowns() {
+                            var fields = [];
+                            $('#wpd-fields-container > .wpd-field-row').each(function(){
+                                var key = $(this).find('.field-key-input').first().val();
+                                var label = $(this).find('.field-label-input').first().val();
+                                if (key && label) {
+                                    fields.push({ key: key, label: label });
+                                }
+                            });
+
+                            $('.wpd-conditional-target-field').each(function(){
+                                var $select = $(this);
+                                var currentTarget = $select.val();
+                                var parentFieldKey = $select.closest('.wpd-field-row').data('field-key');
+
+                                $select.html('<option value=""><?php _e('یک فیلد انتخاب کنید', 'wp-directory'); ?></option>');
+
+                                fields.forEach(function(field) {
+                                    if (field.key !== parentFieldKey) {
+                                        var selected = (field.key === currentTarget) ? ' selected' : '';
+                                        $select.append('<option value="' + field.key + '"' + selected + '>' + field.label + '</option>');
+                                    }
+                                });
+                            });
+                        }
+
                         $('#wpd-field-builder-wrapper').on('change', '.wpd-field-type-selector', function() {
                             toggleOptionsField(this);
-                            toggleRepeaterFields(this);
+                            $(this).closest('.wpd-field-row').find('.wpd-field-type-display').text($(this).val());
                         });
                         $('#wpd-field-builder-wrapper').on('click', '.wpd-toggle-field-details', function(e) {
                             e.preventDefault();
@@ -689,11 +858,18 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         $('#wpd-field-builder-wrapper').on('keyup', '.field-label-input', function() {
                             var newTitle = $(this).val() || 'فیلد جدید';
                             $(this).closest('.wpd-field-row').find('.wpd-field-header strong').text(newTitle);
+                            updateConditionalFieldDropdowns();
                         });
+                        $('#wpd-field-builder-wrapper').on('keyup', '.field-key-input', function() {
+                            $(this).closest('.wpd-field-row').data('field-key', $(this).val());
+                            updateConditionalFieldDropdowns();
+                        });
+
                         $('#wpd-field-builder-wrapper').on('click', '.wpd-remove-field', function(e) {
                             e.preventDefault();
                             if (confirm('آیا از حذف این فیلد مطمئن هستید؟')) {
                                 $(this).closest('.wpd-field-row').remove();
+                                updateConditionalFieldDropdowns();
                             }
                         });
 
@@ -701,11 +877,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             e.preventDefault();
                             var container = $('#wpd-fields-container');
                             var newIndex = container.children().length ? (Math.max.apply(null, container.children().map(function() { return $(this).data('index'); }).get()) + 1) : 0;
-                            var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__')); ?>.replace(/__INDEX__/g, newIndex));
-                            // START OF CHANGE: New fields are collapsed by default
-                            field_html.find('.wpd-field-details').hide();
-                            // END OF CHANGE
+                            var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__', [], $fields)); ?>.replace(/__INDEX__/g, newIndex));
+                            field_html.find('.wpd-field-details').show();
                             container.append(field_html);
+                            updateConditionalFieldDropdowns();
                         });
 
                         $('#wpd-field-builder-wrapper').on('click', '.wpd-add-sub-field', function(e) {
@@ -715,11 +890,24 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             var newSubIndex = subContainer.children().length;
                             var namePrefix = parentIndex + '][sub_fields][' + newSubIndex;
                             var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__')); ?>.replace(/__INDEX__/g, namePrefix));
-                            field_html.find('.wpd-field-details').hide();
+                            field_html.find('.wpd-field-details').show();
                             subContainer.append(field_html);
                         });
 
-                        // START OF CHANGE: Duplicate meta key check
+                        $('#wpd-field-builder-wrapper').on('change', '.wpd-conditional-enable', function() {
+                            $(this).closest('.wpd-conditional-logic-wrapper').find('.wpd-conditional-rules').toggle($(this).is(':checked'));
+                        });
+
+                        $('#wpd-field-builder-wrapper').on('change', '.wpd-conditional-rules select[name*="[operator]"]', function() {
+                            var operator = $(this).val();
+                            var $valueInput = $(this).siblings('input[name*="[value]"]');
+                            if (operator === 'is_empty' || operator === 'is_not_empty') {
+                                $valueInput.hide();
+                            } else {
+                                $valueInput.show();
+                            }
+                        });
+
                         $('form#post').on('submit', function(e){
                             var keys = {};
                             var duplicateFound = false;
@@ -741,7 +929,8 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 e.preventDefault();
                             }
                         });
-                        // END OF CHANGE
+                        
+                        updateConditionalFieldDropdowns();
                     });
                 </script>
                 <?php
@@ -750,20 +939,50 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_listing' ) {
                 ?>
                 <style>
+                    .wpd-fields-container {
+                        display: flex;
+                        flex-wrap: wrap;
+                        margin: 0 -10px;
+                    }
+                    .wpd-admin-field-wrapper {
+                        padding: 0 10px;
+                        margin-bottom: 20px;
+                        box-sizing: border-box;
+                    }
+                    .wpd-admin-field-col-full { width: 100%; }
+                    .wpd-admin-field-col-half { width: 50%; }
+                    .wpd-admin-field-col-third { width: 33.33%; }
+                    .wpd-admin-field-col-quarter { width: 25%; }
+                    @media (max-width: 782px) {
+                        .wpd-admin-field-col-half,
+                        .wpd-admin-field-col-third,
+                        .wpd-admin-field-col-quarter {
+                            width: 100%;
+                        }
+                    }
+                    .wpd-admin-field-wrapper label { font-weight: bold; display: block; margin-bottom: 5px; }
+                    .wpd-admin-field-wrapper input[type="text"],
+                    .wpd-admin-field-wrapper input[type="url"],
+                    .wpd-admin-field-wrapper input[type="email"],
+                    .wpd-admin-field-wrapper input[type="number"],
+                    .wpd-admin-field-wrapper input[type="time"],
+                    .wpd-admin-field-wrapper select,
+                    .wpd-admin-field-wrapper textarea {
+                        width: 100%;
+                    }
                     .wpd-gallery-field-wrapper .gallery-preview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
                     .wpd-gallery-field-wrapper .gallery-preview .image-container { position: relative; }
                     .wpd-gallery-field-wrapper .gallery-preview img { width: 100px; height: 100px; object-fit: cover; border: 1px solid #ddd; }
                     .wpd-gallery-field-wrapper .gallery-preview .remove-image { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; text-align: center; line-height: 20px; }
-                    .wpd-repeater-row { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; background: #fdfdfd; }
+                    .wpd-repeater-row, .wpd-compound-field-row { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; background: #fdfdfd; }
+                    .wpd-repeater-row-actions { margin-top: 10px; text-align: left; }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
 
                         const ajaxNonce = '<?php echo wp_create_nonce("wpd_admin_fields_nonce"); ?>';
 
-                        // START OF CHANGE: AJAX reload fix
                         function initializeWpdComponents(container) {
-                            // Initialize Galleries
                             container.find('.wpd-upload-gallery-button:not([data-initialized])').each(function() {
                                 var $button = $(this);
                                 $button.attr('data-initialized', 'true');
@@ -808,7 +1027,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 $(this).parent().remove();
                             });
 
-                            // Initialize Maps
                             container.find('.wpd-map-field-wrapper:not([data-initialized])').each(function() {
                                 var $wrapper = $(this);
                                 $wrapper.attr('data-initialized', 'true');
@@ -823,7 +1041,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 setTimeout(function() { map.invalidateSize() }, 200);
                             });
                         }
-                        // END OF CHANGE
 
                         $('#wpd_listing_type_selector').on('change', function() {
                             var type_id = $(this).val();
@@ -855,24 +1072,23 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             });
                         });
 
-                        $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-add-row', function(e) {
-                            e.preventDefault();
-                            var template = $(this).siblings('.wpd-repeater-template');
-                            var container = $(this).siblings('.wpd-repeater-rows-container');
-                            var newIndex = container.children().length;
-                            var newRowHtml = template.html().replace(/__INDEX__/g, newIndex);
-                            var newRow = $(newRowHtml).appendTo(container);
-                            initializeWpdComponents(newRow);
-                        });
-
-                        $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-remove-row', function(e) {
+                        $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-remove-row-btn', function(e) {
                             e.preventDefault();
                             if(confirm('آیا از حذف این ردیف مطمئن هستید؟')) {
                                 $(this).closest('.wpd-repeater-row').remove();
                             }
                         });
 
-                        // Initial call for components on page load
+                        $('#wpd-admin-custom-fields-wrapper').on('click', '.wpd-repeater-add-row-btn', function(e) {
+                            e.preventDefault();
+                            var template = $(this).siblings('.wpd-repeater-template');
+                            var container = $(this).siblings('.wpd-repeater-rows-container');
+                            var newIndex = container.children('.wpd-repeater-row').length;
+                            var newRowHtml = template.html().replace(/__INDEX__/g, newIndex);
+                            var newRow = $(newRowHtml).appendTo(container);
+                            initializeWpdComponents(newRow);
+                        });
+
                         initializeWpdComponents($(document.body));
                     });
                 </script>
@@ -880,9 +1096,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             }
         }
         
-        private function get_field_builder_row_html($index_placeholder) {
+        private function get_field_builder_row_html($index_placeholder, $field_data = [], $all_fields = []) {
             ob_start();
-            $this->render_field_builder_row($index_placeholder);
+            $this->render_field_builder_row($index_placeholder, $field_data, $all_fields);
             return ob_get_clean();
         }
 
@@ -909,9 +1125,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if (!is_array($fields) || empty($fields)) return '<p>' . __('هیچ فیلد سفارشی برای این نوع آگهی تعریف نشده است.', 'wp-directory') . '</p>';
 
             ob_start();
-            echo '<table class="form-table"><tbody>';
+            echo '<div class="wpd-fields-container">';
             $this->render_admin_fields_recursive($fields, $post_id);
-            echo '</tbody></table>';
+            echo '</div>';
             return ob_get_clean();
         }
 
@@ -920,24 +1136,26 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 $field_key = $field['key'];
                 $field_name = $name_prefix . '[' . $field_key . ']';
                 
-                $field_id = preg_replace('/\]\[|\[|\]/', '_', $field_name);
+                $field_id = preg_replace('/\]\[|\[|\]/', '_', $name_prefix . '_' . $field_key);
                 $field_id = rtrim($field_id, '_');
 
                 $value = ($meta_prefix === '') ? ($row_data[$field_key] ?? '') : get_post_meta($post_id, $meta_prefix . sanitize_key($field_key), true);
+                
+                $width_class = 'wpd-admin-field-col-' . ($field['width_class'] ?? 'full');
 
                 if ($field['type'] === 'section_title') {
-                    echo '<tr><td colspan="2"><h3 class="wpd-section-title">' . esc_html($field['label']) . '</h3></td></tr>';
+                    echo '<div class="wpd-admin-field-wrapper wpd-admin-field-col-full"><h3 class="wpd-section-title">' . esc_html($field['label']) . '</h3></div>';
                     continue;
                 }
                 if ($field['type'] === 'html_content') {
-                    echo '<tr><td colspan="2">' . wp_kses_post($field['options']) . '</td></tr>';
+                    echo '<div class="wpd-admin-field-wrapper wpd-admin-field-col-full">' . wp_kses_post($field['options']) . '</div>';
                     continue;
                 }
 
                 ?>
-                <tr>
-                    <th><label for="<?php echo esc_attr($field_id); ?>"><?php echo esc_html($field['label']); ?></label></th>
-                    <td>
+                <div class="wpd-admin-field-wrapper <?php echo esc_attr($width_class); ?>">
+                    <label for="<?php echo esc_attr($field_id); ?>"><?php echo esc_html($field['label']); ?></label>
+                    <div class="wpd-field-input-wrapper">
                         <?php
                         $options = !empty($field['options']) ? array_map('trim', explode(',', $field['options'])) : [];
                         switch($field['type']) {
@@ -988,31 +1206,93 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 echo '<div class="map-preview" style="width:100%; height:250px; background:#eee; margin-top:10px;"></div>';
                                 echo '</div>';
                                 break;
+                            
                             case 'repeater':
+                            case 'simple_list':
+                            case 'social_networks':
                                 $rows = is_array($value) ? $value : [];
                                 echo '<div class="wpd-repeater-field-wrapper">';
                                 echo '<div class="wpd-repeater-rows-container">';
                                 if (!empty($rows)) {
                                     foreach ($rows as $index => $row_data) {
-                                        echo '<div class="wpd-repeater-row"><table class="form-table">';
-                                        $this->render_admin_fields_recursive($field['sub_fields'], $post_id, $row_data, $field_name . '[' . $index . ']', '');
-                                        echo '</table><a href="#" class="button button-small wpd-repeater-remove-row">' . __('حذف ردیف', 'wp-directory') . '</a></div>';
+                                        echo '<div class="wpd-repeater-row">';
+                                        if ($field['type'] === 'repeater') {
+                                            echo '<div class="wpd-fields-container">';
+                                            $this->render_admin_fields_recursive($field['sub_fields'], $post_id, $row_data, $field_name . '[' . $index . ']', '');
+                                            echo '</div>';
+                                        } elseif ($field['type'] === 'social_networks') {
+                                            $social_networks = ['instagram' => 'اینستاگرام', 'telegram' => 'تلگرام', 'linkedin' => 'لینکدین', 'x' => 'X (توییتر)', 'whatsapp' => 'واتس‌اپ', 'youtube' => 'یوتیوب', 'aparat' => 'آپارات', 'website' => 'وب‌سایت'];
+                                            echo '<select name="' . esc_attr($field_name . '[' . $index . '][type]') . '">';
+                                            foreach ($social_networks as $net_key => $net_label) {
+                                                echo '<option value="' . esc_attr($net_key) . '" ' . selected($row_data['type'] ?? '', $net_key, false) . '>' . esc_html($net_label) . '</option>';
+                                            }
+                                            echo '</select> ';
+                                            echo '<input type="url" name="' . esc_attr($field_name . '[' . $index . '][url]') . '" value="' . esc_attr($row_data['url'] ?? '') . '" placeholder="لینک" class="regular-text" style="direction:ltr;">';
+                                        } else { // simple_list
+                                            echo '<input type="text" name="' . esc_attr($field_name . '[' . $index . '][text]') . '" value="' . esc_attr($row_data['text'] ?? '') . '" class="large-text">';
+                                        }
+                                        echo '<div class="wpd-repeater-row-actions"><a href="#" class="button button-small wpd-repeater-remove-row-btn">' . __('حذف', 'wp-directory') . '</a></div>';
+                                        echo '</div>';
                                     }
                                 }
                                 echo '</div>';
                                 echo '<div class="wpd-repeater-template" style="display:none;">';
-                                echo '<div class="wpd-repeater-row"><table class="form-table">';
-                                $this->render_admin_fields_recursive($field['sub_fields'], $post_id, [], $field_name . '[__INDEX__]', '');
-                                echo '</table><a href="#" class="button button-small wpd-repeater-remove-row">' . __('حذف ردیف', 'wp-directory') . '</a></div>';
+                                echo '<div class="wpd-repeater-row">';
+                                if ($field['type'] === 'repeater') {
+                                    echo '<div class="wpd-fields-container">';
+                                    $this->render_admin_fields_recursive($field['sub_fields'], $post_id, [], $field_name . '[__INDEX__]', '');
+                                    echo '</div>';
+                                } elseif ($field['type'] === 'social_networks') {
+                                    $social_networks = ['instagram' => 'اینستاگرام', 'telegram' => 'تلگرام', 'linkedin' => 'لینکدین', 'x' => 'X (توییتر)', 'whatsapp' => 'واتس‌اپ', 'youtube' => 'یوتیوب', 'aparat' => 'آپارات', 'website' => 'وب‌سایت'];
+                                    echo '<select name="' . esc_attr($field_name . '[__INDEX__][type]') . '">';
+                                    foreach ($social_networks as $net_key => $net_label) {
+                                        echo '<option value="' . esc_attr($net_key) . '">' . esc_html($net_label) . '</option>';
+                                    }
+                                    echo '</select> ';
+                                    echo '<input type="url" name="' . esc_attr($field_name . '[__INDEX__][url]') . '" value="" placeholder="لینک" class="regular-text" style="direction:ltr;">';
+                                } else { // simple_list
+                                    echo '<input type="text" name="' . esc_attr($field_name . '[__INDEX__][text]') . '" value="" class="large-text">';
+                                }
+                                echo '<div class="wpd-repeater-row-actions"><a href="#" class="button button-small wpd-repeater-remove-row-btn">' . __('حذف', 'wp-directory') . '</a></div>';
                                 echo '</div>';
-                                echo '<a href="#" class="button wpd-repeater-add-row">' . __('افزودن ردیف جدید', 'wp-directory') . '</a>';
+                                echo '</div>';
+                                echo '<a href="#" class="button wpd-repeater-add-row-btn">' . __('افزودن ردیف جدید', 'wp-directory') . '</a>';
                                 echo '</div>';
                                 break;
+                            case 'address':
+                            case 'identity':
+                                $settings = $field[$field['type'].'_settings'] ?? [];
+                                $sub_fields = ($field['type'] === 'address')
+                                    ? ['province' => 'استان', 'city' => 'شهر', 'street' => 'آدرس دقیق', 'postal_code' => 'کد پستی']
+                                    : ['first_name' => 'نام', 'last_name' => 'نام خانوادگی', 'phone' => 'شماره تماس', 'national_id' => 'کد ملی', 'age' => 'سن', 'gender' => 'جنسیت', 'address' => 'آدرس پستی', 'postal_code' => 'کد پستی'];
+                                
+                                echo '<div class="wpd-fields-container">';
+                                foreach ($sub_fields as $sub_key => $sub_label) {
+                                    $sub_settings = $settings[$sub_key] ?? ['enabled' => 1, 'width' => 'full'];
+                                    if (!empty($sub_settings['enabled'])) {
+                                        $sub_value = $value[$sub_key] ?? '';
+                                        $sub_field_width_class = 'wpd-admin-field-col-' . ($sub_settings['width'] ?? 'full');
+                                        echo '<div class="wpd-admin-field-wrapper ' . esc_attr($sub_field_width_class) . '">';
+                                        echo '<label>' . esc_html($sub_label) . ':</label>';
+                                        if ($sub_key === 'gender') {
+                                            echo '<select name="' . esc_attr($field_name . '[' . $sub_key . ']') . '">';
+                                            echo '<option value="male" '.selected($sub_value, 'male', false).'>مرد</option>';
+                                            echo '<option value="female" '.selected($sub_value, 'female', false).'>زن</option>';
+                                            echo '</select>';
+                                        } else {
+                                            echo '<input type="text" name="' . esc_attr($field_name . '[' . $sub_key . ']') . '" value="' . esc_attr($sub_value) . '" class="regular-text">';
+                                        }
+                                        echo '</div>';
+                                    }
+                                }
+                                echo '</div>';
+                                break;
+
                             default: echo '<input type="text" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text">'; break;
                         }
                         ?>
-                    </td>
-                </tr>
+                    </div>
+                </div>
                 <?php
             }
         }

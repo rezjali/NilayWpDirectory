@@ -29,8 +29,8 @@ jQuery(document).ready(function ($) {
             success: function (response) {
                 if (response.success) {
                     wrapper.html(response.data.html);
-                    // START OF CHANGE: Removed datepicker initialization from frontend
-                    // initJalaliDatepicker();
+                    // START OF CHANGE: Initialize conditional logic for newly loaded fields
+                    initConditionalLogic();
                     // END OF CHANGE
                 } else {
                     wrapper.html('<p class="wpd-alert wpd-alert-danger">' + response.data.message + '</p>');
@@ -116,5 +116,73 @@ jQuery(document).ready(function ($) {
         var paged = url.searchParams.get("paged") || 1;
         submitFilterForm(paged);
     });
+
+    // START OF CHANGE: Conditional Logic Functions
+    /**
+     * ------------------------------------------------
+     * 4. منطق شرطی برای فیلدهای فرم
+     * ------------------------------------------------
+     */
+    function checkConditionalLogic() {
+        $('.wpd-form-group[data-conditional-logic]').each(function () {
+            var $dependentField = $(this);
+            var logic;
+            try {
+                logic = JSON.parse($dependentField.attr('data-conditional-logic'));
+            } catch (e) {
+                console.error('Invalid conditional logic JSON:', $dependentField.attr('data-conditional-logic'));
+                return;
+            }
+
+            if (!logic.target_field) return;
+
+            var $targetField = $('[name="wpd_custom[' + logic.target_field + ']"], [name="wpd_custom[' + logic.target_field + '][]"]');
+            var targetValue;
+
+            if ($targetField.is(':radio') || $targetField.is(':checkbox')) {
+                targetValue = $targetField.filter(':checked').val() || '';
+            } else {
+                targetValue = $targetField.val() || '';
+            }
+
+            var conditionMet = false;
+            switch (logic.operator) {
+                case 'is':
+                    conditionMet = (targetValue == logic.value);
+                    break;
+                case 'is_not':
+                    conditionMet = (targetValue != logic.value);
+                    break;
+                case 'is_empty':
+                    conditionMet = (targetValue === '' || targetValue === null || targetValue.length === 0);
+                    break;
+                case 'is_not_empty':
+                    conditionMet = (targetValue !== '' && targetValue !== null && targetValue.length > 0);
+                    break;
+            }
+
+            var shouldShow = (logic.action === 'show') ? conditionMet : !conditionMet;
+
+            if (shouldShow) {
+                $dependentField.slideDown();
+            } else {
+                $dependentField.slideUp();
+            }
+        });
+    }
+
+    function initConditionalLogic() {
+        // Run on page load for all fields
+        checkConditionalLogic();
+
+        // Attach event listeners to all potential target fields
+        $('#wpd-custom-fields-wrapper').on('change keyup', 'input, select, textarea', function () {
+            checkConditionalLogic();
+        });
+    }
+
+    // Initial call
+    initConditionalLogic();
+    // END OF CHANGE
 
 });

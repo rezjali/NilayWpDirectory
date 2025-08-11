@@ -271,7 +271,6 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
             exit;
         }
 
-        // START OF CHANGE: New verification functions
         public static function verify_zarinpal_credentials($api_key) {
             $response = wp_remote_post('https://api.zarinpal.com/pg/v4/payment/request.json', [
                 'headers' => ['Content-Type' => 'application/json'],
@@ -342,7 +341,10 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
             }
         }
 
-        public static function verify_farazsms_credentials($api_key) {
+        public static function verify_farazsms_credentials($api_key, $sender_number) {
+             if (empty($sender_number)) {
+                return ['success' => false, 'message' => 'لطفاً شماره فرستنده را وارد کنید.'];
+             }
              $url = 'http://ippanel.com/api/v1/user/credit';
              $response = wp_remote_get($url, [
                 'headers' => ['Authorization' => 'AccessKey ' . $api_key]
@@ -362,6 +364,5 @@ if ( ! class_exists( 'Directory_Gateways' ) ) {
                  return ['success' => false, 'message' => 'خطا: ' . ($body['status']['message'] ?? 'کلید API نامعتبر است.')];
             }
         }
-        // END OF CHANGE
     }
 }
