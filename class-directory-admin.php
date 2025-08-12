@@ -182,7 +182,7 @@ class Directory_Admin {
 
             <form action="options.php" method="post">
                 <?php settings_fields( 'wpd_settings_group' ); ?>
-                <div id="tab-general" class="wpd-settings-tab"><table class="form-table"><?php do_settings_sections( 'wpd_settings_general' ); ?></table></div>
+                <div id="tab-general" class="wpd-settings-tab active"><table class="form-table"><?php do_settings_sections( 'wpd_settings_general' ); ?></table></div>
                 <div id="tab-payments" class="wpd-settings-tab"><?php do_settings_sections( 'wpd_settings_payments' ); ?></div>
                 <div id="tab-sms" class="wpd-settings-tab"><?php do_settings_sections( 'wpd_settings_sms' ); ?></div>
                 <div id="tab-notifications" class="wpd-settings-tab"><?php do_settings_sections( 'wpd_settings_notifications' ); ?></div>
@@ -248,11 +248,11 @@ class Directory_Admin {
     public function render_help_tab_content() {
         ?>
         <h2><?php _e('راهنمای استفاده از افزونه نیلای دایرکتوری', 'wp-directory'); ?></h2>
-        <p><?php _e('به راهنمای افزونه دایرکتوری خوش آمدید. در اینجا می‌توانید با روش کار و شورت‌کدهای افزونه آشنا شوید.', 'wp-directory'); ?></p>
+        <p><?php _e('به راهنمای جامع افزونه دایرکتوری خوش آمدید. در اینجا می‌توانید با مراحل راه‌اندازی، شورت‌کدها و ابزارهای کلیدی افزونه آشنا شوید.', 'wp-directory'); ?></p>
         
         <h3><?php _e('مراحل راه‌اندازی اولیه', 'wp-directory'); ?></h3>
         <ol>
-            <li><?php _e('<strong>ساخت انواع آگهی:</strong> از منوی "نیلای دایرکتوری > انواع آگهی"، نوع‌های مختلف آگهی خود (مثلا املاک، خودرو) را بسازید. در صفحه ویرایش هر نوع، می‌توانید فیلدهای سفارشی، هزینه ثبت و اعلان‌های اختصاصی آن را تعریف کنید.', 'wp-directory'); ?></li>
+            <li><?php _e('<strong>ساخت انواع آگهی:</strong> از منوی "نیلای دایرکتوری > انواع آگهی"، نوع‌های مختلف آگهی خود (مثلا املاک، خودرو) را بسازید. در صفحه ویرایش هر نوع، می‌توانید فیلدهای سفارشی، طبقه‌بندی‌ها، هزینه ثبت و اعلان‌های اختصاصی آن را تعریف کنید.', 'wp-directory'); ?></li>
             <li><?php _e('<strong>پیکربندی مدل درآمدی:</strong> به "تنظیمات > عمومی" بروید. مشخص کنید که آیا می‌خواهید از <strong>سیستم بسته‌های عضویت</strong> استفاده کنید یا خیر. اگر این گزینه را غیرفعال کنید، درآمد شما فقط از طریق "هزینه ثبت" که برای هر نوع آگهی تعریف کرده‌اید، خواهد بود.', 'wp-directory'); ?></li>
             <li><?php _e('<strong>ساخت بسته‌های عضویت و ارتقا:</strong> از منوهای مربوطه، بسته‌های ثبت آگهی و بسته‌های ارتقا (ویژه کردن، نردبان و...) را تعریف کنید.', 'wp-directory'); ?></li>
             <li><?php _e('<strong>ایجاد برگه‌های اصلی:</strong> سه برگه جدید در وردپرس بسازید: یکی برای "ثبت آگهی"، یکی برای "داشبورد کاربری" و یکی برای "آرشیو آگهی‌ها".', 'wp-directory'); ?></li>
@@ -260,6 +260,14 @@ class Directory_Admin {
             <li><?php _e('<strong>تنظیمات عمومی:</strong> از تب "عمومی" در همین صفحه، برگه‌هایی که ساختید را به افزونه معرفی کنید.', 'wp-directory'); ?></li>
             <li><?php _e('<strong>پیکربندی درگاه پرداخت و پیامک:</strong> کلیدهای API خود را در تب‌های "پرداخت" و "پیامک" وارد کنید.', 'wp-directory'); ?></li>
         </ol>
+
+        <h3><?php _e('ابزارهای مفید', 'wp-directory'); ?></h3>
+        <ul>
+            <li><?php _e('<strong>وضعیت سیستم:</strong> در منوی "ابزارها"، وضعیت محیط وردپرس و سرور خود را بررسی کنید تا از عملکرد صحیح افزونه مطمئن شوید.', 'wp-directory'); ?></li>
+            <li><?php _e('<strong>مدیریت داده‌ها:</strong> در تب "مدیریت داده‌ها" در صفحه ابزارها، می‌توانید از تنظیمات افزونه، انواع آگهی‌ها و خود آگهی‌ها، فایل پشتیبان (Export) تهیه کنید و یا فایل‌های پشتیبان قبلی را بارگذاری (Import) نمایید.', 'wp-directory'); ?></li>
+            <li><?php _e('<strong>پاک کردن کش:</strong> از ابزارهای نگهداری در صفحه ابزارها، تمام کش افزونه را پاک کنید.', 'wp-directory'); ?></li>
+            <li><?php _e('<strong>اجرای رویدادهای روزانه:</strong> با استفاده از ابزار مربوطه، می‌توانید رویدادهای زمان‌بندی شده مانند منقضی کردن آگهی‌ها را به صورت دستی اجرا کنید.', 'wp-directory'); ?></li>
+        </ul>
 
         <h3><?php _e('لیست شورت‌کدها', 'wp-directory'); ?></h3>
         <table class="widefat striped">
@@ -744,8 +752,6 @@ JS;
         }
     }
 
-    // START OF NEW FEATURES: All new functions for added features
-
     /**
      * Adds the dashboard widget.
      */
@@ -848,7 +854,7 @@ JS;
         $listings_per_type_raw = $wpdb->get_results(
             "SELECT p.post_title, COUNT(pm.post_id) as count
             FROM {$wpdb->postmeta} pm
-            JOIN {$wpdb->posts} p ON pm.meta_value = p.ID
+            JOIN {$wpdb->posts} p ON pm->meta_value = p.ID
             WHERE pm.meta_key = '_wpd_listing_type'
             GROUP BY pm.meta_value"
         );
@@ -915,25 +921,79 @@ JS;
     }
 
     /**
-     * Renders the Tools page with System Status.
+     * Renders the Tools page with System Status and import/export tools.
      */
     public function render_tools_page() {
         ?>
         <div class="wrap">
             <h1><?php _e('ابزارها و وضعیت سیستم', 'wp-directory'); ?></h1>
-            <h2 class="nav-tab-wrapper">
-                <a href="#system-status" data-tab="system-status" class="nav-tab"><?php _e('وضعیت سیستم', 'wp-directory'); ?></a>
-                <a href="#tools" data-tab="tools" class="nav-tab"><?php _e('ابزارها', 'wp-directory'); ?></a>
+            
+            <h2 class="nav-tab-wrapper wpd-tools-tab-wrapper">
+                <a href="#system-status" data-tab="system-status" class="nav-tab nav-tab-active"><?php _e('وضعیت سیستم', 'wp-directory'); ?></a>
+                <a href="#tools" data-tab="tools" class="nav-tab"><?php _e('ابزارهای نگهداری', 'wp-directory'); ?></a>
+                <a href="#data-management" data-tab="data-management" class="nav-tab"><?php _e('مدیریت داده‌ها', 'wp-directory'); ?></a>
             </h2>
 
-            <div id="tab-system-status" class="wpd-settings-tab">
+            <div id="tab-system-status" class="wpd-settings-tab active">
                 <?php $this->render_system_status_content(); ?>
             </div>
 
             <div id="tab-tools" class="wpd-settings-tab">
                 <?php $this->render_tools_content(); ?>
             </div>
+            
+            <div id="tab-data-management" class="wpd-settings-tab">
+                <?php $this->render_data_management_content(); ?>
+            </div>
         </div>
+
+        <script type="text/javascript">
+            jQuery(document).ready(function($){
+                function handleToolsTabs() {
+                    var $tabWrapper = $('.wpd-tools-tab-wrapper');
+                    if (!$tabWrapper.length) return;
+
+                    var activeTab = window.location.hash.replace('#', '');
+                    // اگر تب فعال در URL نبود یا معتبر نبود، تب اول را فعال کن
+                    if (activeTab === '' || $tabWrapper.find('.nav-tab[data-tab="' + activeTab + '"]').length === 0) {
+                        activeTab = $tabWrapper.find('.nav-tab:first').data('tab');
+                    }
+                    
+                    $tabWrapper.find('.nav-tab').removeClass('nav-tab-active');
+                    $('.wpd-settings-tab').removeClass('active').hide(); // همه تب‌ها را پنهان کن
+                    
+                    $tabWrapper.find('.nav-tab[data-tab="' + activeTab + '"]').addClass('nav-tab-active');
+                    $('#tab-' + activeTab).addClass('active').show(); // تب فعال را نمایش بده
+
+                    $tabWrapper.find('.nav-tab').off('click').on('click', function(e){
+                        e.preventDefault();
+                        var tab_id = $(this).data('tab');
+                        
+                        $tabWrapper.find('.nav-tab').removeClass('nav-tab-active');
+                        $('.wpd-settings-tab').removeClass('active').hide();
+                        
+                        $(this).addClass('nav-tab-active');
+                        $('#tab-' + tab_id).addClass('active').show();
+                        
+                        window.location.hash = tab_id;
+                    });
+                }
+                handleToolsTabs();
+                
+                // Import
+                $('.wpd-import-form').on('submit', function(e) {
+                    var $form = $(this);
+                    var fileInput = $form.find('input[type="file"]');
+                    if (fileInput.val() === '') {
+                        e.preventDefault();
+                        alert('<?php _e('لطفا یک فایل برای وارد کردن انتخاب کنید.', 'wp-directory'); ?>');
+                    } else {
+                        // نمایش لودینگ
+                        $form.find('button').prop('disabled', true).text('<?php _e('در حال وارد کردن...', 'wp-directory'); ?>');
+                    }
+                });
+            });
+        </script>
         <?php
     }
 
@@ -979,40 +1039,442 @@ JS;
         ?>
         <h3 style="margin-top:20px;"><?php _e('ابزارهای نگهداری', 'wp-directory'); ?></h3>
         <table class="form-table">
-            <tr>
-                <th><?php _e('پاک کردن کش افزونه', 'wp-directory'); ?></th>
-                <td>
-                    <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=clear_transients'), 'wpd_clear_transients_nonce'); ?>" class="button"><?php _e('پاک کردن کش', 'wp-directory'); ?></a>
-                    <p class="description"><?php _e('این ابزار تمام داده‌های موقت (transients) که توسط افزونه نیلای دایرکتوری ایجاد شده را حذف می‌کند.', 'wp-directory'); ?></p>
-                </td>
-            </tr>
-            <tr>
-                <th><?php _e('اجرای مجدد رویدادهای روزانه', 'wp-directory'); ?></th>
-                <td>
-                    <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=run_daily_events'), 'wpd_run_daily_events_nonce'); ?>" class="button"><?php _e('اجرای رویدادها', 'wp-directory'); ?></a>
-                    <p class="description"><?php _e('این ابزار به صورت دستی رویدادهای زمان‌بندی شده روزانه (مانند منقضی کردن آگهی‌ها) را اجرا می‌کند.', 'wp-directory'); ?></p>
-                </td>
-            </tr>
+            <tbody>
+                <tr>
+                    <th><?php _e('پاک کردن کش افزونه', 'wp-directory'); ?></th>
+                    <td>
+                        <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=clear_transients'), 'wpd_clear_transients_nonce'); ?>" class="button"><?php _e('پاک کردن کش', 'wp-directory'); ?></a>
+                        <p class="description"><?php _e('این ابزار تمام داده‌های موقت (transients) که توسط افزونه نیلای دایرکتوری ایجاد شده را حذف می‌کند.', 'wp-directory'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><?php _e('اجرای مجدد رویدادهای روزانه', 'wp-directory'); ?></th>
+                    <td>
+                        <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=run_daily_events'), 'wpd_run_daily_events_nonce'); ?>" class="button"><?php _e('اجرای رویدادها', 'wp-directory'); ?></a>
+                        <p class="description"><?php _e('این ابزار به صورت دستی رویدادهای زمان‌بندی شده روزانه (مانند منقضی کردن آگهی‌ها) را اجرا می‌کند.', 'wp-directory'); ?></p>
+                    </td>
+                </tr>
+            </tbody>
         </table>
+        <?php
+    }
+
+    /**
+     * Renders the new data management tab content.
+     */
+    private function render_data_management_content() {
+        $listing_types = get_posts([
+            'post_type' => 'wpd_listing_type',
+            'posts_per_page' => -1,
+            'orderby' => 'title',
+            'order' => 'ASC'
+        ]);
+        ?>
+        <div class="wpd-data-management-tools" style="margin-top:20px;">
+            <h3><?php _e('تنظیمات افزونه', 'wp-directory'); ?></h3>
+            <table class="form-table">
+                <tbody>
+                    <tr>
+                        <th><?php _e('برون‌بری تنظیمات', 'wp-directory'); ?></th>
+                        <td>
+                            <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=export_settings'), 'wpd_export_settings_nonce'); ?>" class="button"><?php _e('دانلود فایل', 'wp-directory'); ?></a>
+                            <p class="description"><?php _e('از تمام تنظیمات افزونه یک فایل پشتیبان تهیه می‌کند.', 'wp-directory'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('درون‌ریزی تنظیمات', 'wp-directory'); ?></th>
+                        <td>
+                            <form method="post" enctype="multipart/form-data" class="wpd-import-form">
+                                <?php wp_nonce_field('wpd_import_settings_nonce'); ?>
+                                <input type="hidden" name="wpd_tool_action" value="import_settings">
+                                <input type="file" name="import_file" accept=".json" required>
+                                <button type="submit" class="button button-primary"><?php _e('آپلود و وارد کردن', 'wp-directory'); ?></button>
+                            </form>
+                            <p class="description"><?php _e('فایل JSON تنظیمات را برای بارگذاری انتخاب کنید.', 'wp-directory'); ?></p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3><?php _e('انواع آگهی', 'wp-directory'); ?></h3>
+            <table class="form-table">
+                <tbody>
+                    <tr>
+                        <th><?php _e('برون‌بری انواع آگهی', 'wp-directory'); ?></th>
+                        <td>
+                            <form method="get" class="wpd-export-form" style="display: flex; gap: 10px;">
+                                <input type="hidden" name="page" value="wpd-tools">
+                                <input type="hidden" name="wpd_tool_action" value="export_listing_types_selected">
+                                <?php wp_nonce_field('wpd_export_listing_types_nonce_selected'); ?>
+                                <select name="listing_type_id" id="export-listing-type" required>
+                                    <option value=""><?php _e('انتخاب نوع آگهی...', 'wp-directory'); ?></option>
+                                    <?php
+                                    if (!empty($listing_types)) {
+                                        foreach ($listing_types as $type) {
+                                            echo '<option value="' . esc_attr($type->ID) . '">' . esc_html($type->post_title) . '</option>';
+                                        }
+                                    }
+                                    ?>
+                                </select>
+                                <button type="submit" class="button"><?php _e('دانلود فایل', 'wp-directory'); ?></button>
+                            </form>
+                            <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=export_listing_types_all'), 'wpd_export_listing_types_all_nonce'); ?>" class="button" style="margin-top: 10px;"><?php _e('برون‌بری همه', 'wp-directory'); ?></a>
+                            <p class="description"><?php _e('یک نوع آگهی را انتخاب کرده یا همه را برون‌بری کنید. این شامل فیلدهای سفارشی و طبقه‌بندی‌های مرتبط نیز می‌شود.', 'wp-directory'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('درون‌ریزی انواع آگهی', 'wp-directory'); ?></th>
+                        <td>
+                            <form method="post" enctype="multipart/form-data" class="wpd-import-form">
+                                <?php wp_nonce_field('wpd_import_listing_types_nonce'); ?>
+                                <input type="hidden" name="wpd_tool_action" value="import_listing_types">
+                                <input type="file" name="import_file" accept=".json" required>
+                                <button type="submit" class="button button-primary"><?php _e('آپلود و وارد کردن', 'wp-directory'); ?></button>
+                            </form>
+                            <p class="description"><?php _e('فایل JSON انواع آگهی را برای بارگذاری انتخاب کنید.', 'wp-directory'); ?></p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3><?php _e('آگهی‌های ثبت شده', 'wp-directory'); ?></h3>
+            <table class="form-table">
+                <tbody>
+                    <tr>
+                        <th><?php _e('برون‌بری آگهی‌ها', 'wp-directory'); ?></th>
+                        <td>
+                            <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=export_listings'), 'wpd_export_listings_nonce'); ?>" class="button"><?php _e('دانلود فایل', 'wp-directory'); ?></a>
+                            <p class="description"><?php _e('تمام آگهی‌ها، محتوا و اطلاعات متا آن‌ها را برون‌بری می‌کند. (ممکن است زمان‌بر باشد)', 'wp-directory'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php _e('درون‌ریزی آگهی‌ها', 'wp-directory'); ?></th>
+                        <td>
+                            <form method="post" enctype="multipart/form-data" class="wpd-import-form">
+                                <?php wp_nonce_field('wpd_import_listings_nonce'); ?>
+                                <input type="hidden" name="wpd_tool_action" value="import_listings">
+                                <input type="file" name="import_file" accept=".json" required>
+                                <button type="submit" class="button button-primary"><?php _e('آپلود و وارد کردن', 'wp-directory'); ?></button>
+                            </form>
+                            <p class="description"><?php _e('فایل JSON آگهی‌ها را برای بارگذاری انتخاب کنید.', 'wp-directory'); ?></p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+        </div>
         <?php
     }
     
     public function handle_tools_actions() {
-        if (isset($_GET['wpd_tool_action']) && current_user_can('manage_options')) {
-            $action = sanitize_key($_GET['wpd_tool_action']);
-            if ($action === 'clear_transients' && check_admin_referer('wpd_clear_transients_nonce')) {
-                Directory_Main::clear_transients();
-                add_action('admin_notices', function() {
-                    echo '<div class="notice notice-success is-dismissible"><p>' . __('کش افزونه با موفقیت پاک شد.', 'wp-directory') . '</p></div>';
-                });
+        if (isset($_GET['wpd_tool_action']) || isset($_POST['wpd_tool_action'])) {
+            $action = sanitize_key($_REQUEST['wpd_tool_action']);
+
+            if (!current_user_can('manage_options')) {
+                return;
             }
-            if ($action === 'run_daily_events' && check_admin_referer('wpd_run_daily_events_nonce')) {
-                do_action('wpd_daily_scheduled_events');
-                add_action('admin_notices', function() {
-                    echo '<div class="notice notice-success is-dismissible"><p>' . __('رویدادهای روزانه با موفقیت اجرا شدند.', 'wp-directory') . '</p></div>';
-                });
+
+            switch ($action) {
+                case 'clear_transients':
+                    if (isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'wpd_clear_transients_nonce')) {
+                        Directory_Main::clear_transients();
+                        add_action('admin_notices', function() {
+                            echo '<div class="notice notice-success is-dismissible"><p>' . __('کش افزونه با موفقیت پاک شد.', 'wp-directory') . '</p></div>';
+                        });
+                    }
+                    break;
+                case 'run_daily_events':
+                    if (isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'wpd_run_daily_events_nonce')) {
+                        do_action('wpd_daily_scheduled_events');
+                        add_action('admin_notices', function() {
+                            echo '<div class="notice notice-success is-dismissible"><p>' . __('رویدادهای روزانه با موفقیت اجرا شدند.', 'wp-directory') . '</p></div>';
+                        });
+                    }
+                    break;
+                case 'export_settings':
+                    $this->handle_export_settings();
+                    break;
+                case 'import_settings':
+                    $this->handle_import_settings();
+                    break;
+                case 'export_listing_types_all':
+                    $this->handle_export_listing_types();
+                    break;
+                case 'export_listing_types_selected':
+                    $this->handle_export_listing_types_selected();
+                    break;
+                case 'import_listing_types':
+                    $this->handle_import_listing_types();
+                    break;
+                case 'export_listings':
+                    $this->handle_export_listings();
+                    break;
+                case 'import_listings':
+                    $this->handle_import_listings();
+                    break;
             }
         }
+    }
+    
+    private function handle_export_listing_types_selected() {
+        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'wpd_export_listing_types_nonce_selected')) {
+            wp_die('شما اجازه انجام این کار را ندارید.');
+        }
+
+        $listing_type_id = isset($_GET['listing_type_id']) ? intval($_GET['listing_type_id']) : 0;
+        if (empty($listing_type_id)) {
+            wp_die('نوع آگهی نامعتبر است.');
+        }
+        
+        $post = get_post($listing_type_id);
+        if (!$post || $post->post_type !== 'wpd_listing_type') {
+            wp_die('نوع آگهی پیدا نشد.');
+        }
+        
+        $post_meta = get_post_meta($post->ID);
+        $meta_data = [];
+        foreach ($post_meta as $key => $value) {
+            if (strpos($key, '_wpd_') === 0 || $key === '_defined_taxonomies' || $key === '_cost' || $key === '_notification_settings') {
+                $meta_data[$key] = maybe_unserialize($value[0]);
+            }
+        }
+
+        $export_data = [[
+            'post_title' => $post->post_title,
+            'post_content' => $post->post_content,
+            'post_name' => $post->post_name,
+            'meta' => $meta_data
+        ]];
+
+        $filename = 'wpd-listing-type-' . ($post->post_name ?: $post->ID) . '-' . date('Y-m-d') . '.json';
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo json_encode($export_data, JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    private function handle_export_settings() {
+        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'wpd_export_settings_nonce')) {
+            wp_die('شما اجازه انجام این کار را ندارید.');
+        }
+
+        $settings = get_option('wpd_settings');
+        $filename = 'wpd-settings-' . date('Y-m-d') . '.json';
+
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo json_encode($settings, JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    private function handle_import_settings() {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'wpd_import_settings_nonce')) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: دسترسی غیرمجاز.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        if (empty($_FILES['import_file']['tmp_name'])) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: لطفا یک فایل برای آپلود انتخاب کنید.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        $file_content = file_get_contents($_FILES['import_file']['tmp_name']);
+        $settings_data = json_decode($file_content, true);
+
+        if ($settings_data === null) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: فایل JSON نامعتبر است.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        update_option('wpd_settings', $settings_data);
+        add_action('admin_notices', function() {
+            echo '<div class="notice notice-success is-dismissible"><p>' . __('تنظیمات افزونه با موفقیت وارد شد.', 'wp-directory') . '</p></div>';
+        });
+    }
+
+    private function handle_export_listing_types() {
+        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'wpd_export_listing_types_all_nonce')) {
+            wp_die('شما اجازه انجام این کار را ندارید.');
+        }
+
+        $args = [
+            'post_type' => 'wpd_listing_type',
+            'posts_per_page' => -1,
+            'post_status' => ['publish', 'draft']
+        ];
+        $listing_types = get_posts($args);
+        $export_data = [];
+
+        foreach ($listing_types as $post) {
+            $post_meta = get_post_meta($post->ID);
+            $meta_data = [];
+            foreach ($post_meta as $key => $value) {
+                // فقط متاهای مرتبط با افزونه را برون‌بری کن
+                if (strpos($key, '_wpd_') === 0 || $key === '_defined_taxonomies' || $key === '_cost' || $key === '_notification_settings') {
+                    $meta_data[$key] = maybe_unserialize($value[0]);
+                }
+            }
+
+            $export_data[] = [
+                'post_title' => $post->post_title,
+                'post_content' => $post->post_content,
+                'post_name' => $post->post_name,
+                'meta' => $meta_data
+            ];
+        }
+
+        $filename = 'wpd-listing-types-all-' . date('Y-m-d') . '.json';
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo json_encode($export_data, JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    private function handle_import_listing_types() {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'wpd_import_listing_types_nonce')) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: دسترسی غیرمجاز.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        if (empty($_FILES['import_file']['tmp_name'])) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: لطفا یک فایل برای آپلود انتخاب کنید.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        $file_content = file_get_contents($_FILES['import_file']['tmp_name']);
+        $import_data = json_decode($file_content, true);
+
+        if (!is_array($import_data)) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: فایل JSON نامعتبر است.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        foreach ($import_data as $data) {
+            $post_data = [
+                'post_title' => sanitize_text_field($data['post_title']),
+                'post_content' => wp_kses_post($data['post_content']),
+                'post_name' => sanitize_title($data['post_name']),
+                'post_type' => 'wpd_listing_type',
+                'post_status' => 'publish',
+            ];
+            $post_id = wp_insert_post($post_data);
+            
+            if (!is_wp_error($post_id) && isset($data['meta'])) {
+                foreach ($data['meta'] as $key => $value) {
+                    if (is_string($value)) {
+                         update_post_meta($post_id, $key, sanitize_text_field($value));
+                    } elseif (is_array($value)) {
+                         update_post_meta($post_id, $key, $value); // باید در مرحله ذخیره و خواندن، sanitize شود
+                    }
+                }
+            }
+        }
+
+        add_action('admin_notices', function() {
+            echo '<div class="notice notice-success is-dismissible"><p>' . __('انواع آگهی‌ها با موفقیت وارد شدند.', 'wp-directory') . '</p></div>';
+        });
+    }
+
+    private function handle_export_listings() {
+        if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'wpd_export_listings_nonce')) {
+            wp_die('شما اجازه انجام این کار را ندارید.');
+        }
+
+        $args = [
+            'post_type' => 'wpd_listing',
+            'posts_per_page' => -1,
+            'post_status' => ['publish', 'pending', 'expired', 'draft']
+        ];
+        $listings = get_posts($args);
+        $export_data = [];
+
+        foreach ($listings as $post) {
+            $post_meta = get_post_meta($post->ID);
+            $meta_data = [];
+            foreach ($post_meta as $key => $value) {
+                if (strpos($key, '_wpd_') === 0) {
+                    $meta_data[$key] = maybe_unserialize($value[0]);
+                }
+            }
+
+            $export_data[] = [
+                'post_title' => $post->post_title,
+                'post_content' => $post->post_content,
+                'post_status' => $post->post_status,
+                'post_author' => $post->post_author,
+                'meta' => $meta_data,
+                'terms' => wp_get_post_terms($post->ID, get_object_taxonomies('wpd_listing'), ['fields' => 'names'])
+            ];
+        }
+
+        $filename = 'wpd-listings-' . date('Y-m-d') . '.json';
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo json_encode($export_data, JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    private function handle_import_listings() {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'wpd_import_listings_nonce')) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: دسترسی غیرمجاز.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        if (empty($_FILES['import_file']['tmp_name'])) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: لطفا یک فایل برای آپلود انتخاب کنید.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+        
+        $file_content = file_get_contents($_FILES['import_file']['tmp_name']);
+        $import_data = json_decode($file_content, true);
+
+        if (!is_array($import_data)) {
+            add_action('admin_notices', function() {
+                echo '<div class="notice notice-error"><p>' . __('خطا: فایل JSON نامعتبر است.', 'wp-directory') . '</p></div>';
+            });
+            return;
+        }
+
+        foreach ($import_data as $data) {
+            $post_data = [
+                'post_title' => sanitize_text_field($data['post_title']),
+                'post_content' => wp_kses_post($data['post_content']),
+                'post_status' => sanitize_key($data['post_status']),
+                'post_author' => intval($data['post_author']),
+                'post_type' => 'wpd_listing',
+            ];
+            $post_id = wp_insert_post($post_data);
+
+            if (!is_wp_error($post_id) && isset($data['meta'])) {
+                foreach ($data['meta'] as $key => $value) {
+                    if (is_string($value)) {
+                         update_post_meta($post_id, $key, sanitize_text_field($value));
+                    } elseif (is_array($value)) {
+                         update_post_meta($post_id, $key, $value); // باید در مرحله ذخیره و خواندن، sanitize شود
+                    }
+                }
+            }
+        }
+
+        add_action('admin_notices', function() {
+            echo '<div class="notice notice-success is-dismissible"><p>' . __('آگهی‌ها با موفقیت وارد شدند.', 'wp-directory') . '</p></div>';
+        });
     }
 
     private function render_add_transaction_page() {
