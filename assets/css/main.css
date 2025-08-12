@@ -1,0 +1,311 @@
+/*
+ * =================================================================
+ * WPD Directory Plugin - Main Frontend Stylesheet
+ * Version: 1.1.0
+ * =================================================================
+ */
+
+/* -----------------------------------------
+   1. متغیرهای CSS (مقادیر پیش‌فرض)
+   ----------------------------------------- */
+:root {
+    --wpd-primary-color: #0073aa;
+    --wpd-primary-color-hover: #005a87;
+    --wpd-text-color: #444444;
+    --wpd-bg-color: #ffffff;
+    --wpd-border-color: #dddddd;
+    --wpd-alert-success-bg: #d4edda;
+    --wpd-alert-success-text: #155724;
+    --wpd-alert-warning-bg: #fff3cd;
+    --wpd-alert-warning-text: #856404;
+    --wpd-alert-danger-bg: #f8d7da;
+    --wpd-alert-danger-text: #721c24;
+}
+
+/* -----------------------------------------
+   2. استایل‌های عمومی و کمکی
+   ----------------------------------------- */
+.wpd-container {
+    max-width: 960px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: var(--wpd-bg-color);
+    border: 1px solid var(--wpd-border-color);
+    border-radius: 5px;
+    direction: rtl;
+    text-align: right;
+}
+
+.wpd-alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.wpd-alert-success {
+    color: var(--wpd-alert-success-text);
+    background-color: var(--wpd-alert-success-bg);
+}
+
+.wpd-alert-warning {
+    color: var(--wpd-alert-warning-text);
+    background-color: var(--wpd-alert-warning-bg);
+}
+
+.wpd-alert-danger {
+    color: var(--wpd-alert-danger-text);
+    background-color: var(--wpd-alert-danger-bg);
+}
+
+.wpd-loading-text {
+    color: #888;
+    font-style: italic;
+}
+
+/* -----------------------------------------
+   3. استایل فرم‌ها
+   ----------------------------------------- */
+.wpd-form-group {
+    margin-bottom: 20px;
+}
+
+.wpd-form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.wpd-form-group input[type="text"],
+.wpd-form-group input[type="email"],
+.wpd-form-group input[type="number"],
+.wpd-form-group input[type="url"],
+.wpd-form-group select,
+.wpd-form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--wpd-border-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.wpd-form-group .wp-editor-wrap {
+    border: 1px solid var(--wpd-border-color);
+    border-radius: 4px;
+}
+
+/* -----------------------------------------
+   4. استایل دکمه‌ها
+   ----------------------------------------- */
+.wpd-button,
+button[type="submit"] {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+    background-color: var(--wpd-primary-color);
+    border: 1px solid var(--wpd-primary-color);
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+.wpd-button:hover,
+button[type="submit"]:hover {
+    background-color: var(--wpd-primary-color-hover);
+    border-color: var(--wpd-primary-color-hover);
+    color: #ffffff;
+}
+
+/* -----------------------------------------
+   5. استایل آرشیو آگهی‌ها
+   ----------------------------------------- */
+.wpd-listings-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.wpd-listing-item {
+    flex: 1 1 300px;
+    border: 1px solid var(--wpd-border-color);
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: var(--wpd-bg-color);
+    transition: box-shadow 0.3s ease;
+}
+
+.wpd-listing-item:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.wpd-item-thumbnail img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.wpd-item-content {
+    padding: 15px;
+}
+
+.wpd-item-content h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.2em;
+}
+
+.wpd-item-content h3 a {
+    text-decoration: none;
+    color: var(--wpd-primary-color);
+}
+
+.wpd-item-content .wpd-item-excerpt {
+    font-size: 0.9em;
+    color: #666;
+}
+
+/* -----------------------------------------
+   6. استایل داشبورد کاربری
+   ----------------------------------------- */
+.wpd-dashboard-container {
+    display: flex;
+    gap: 20px;
+}
+
+.wpd-dashboard-nav {
+    flex: 0 0 200px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.wpd-dashboard-nav li {
+    margin-bottom: 5px;
+}
+
+.wpd-dashboard-nav a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: var(--wpd-text-color);
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+.wpd-dashboard-nav li.active a,
+.wpd-dashboard-nav a:hover {
+    background-color: var(--wpd-primary-color);
+    color: #ffffff;
+}
+
+.wpd-dashboard-content {
+    flex-grow: 1;
+}
+
+.wpd-tab-content {
+    display: none;
+}
+
+.wpd-tab-content.active {
+    display: block;
+}
+
+.wpd-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.wpd-table th,
+.wpd-table td {
+    padding: 10px;
+    border: 1px solid var(--wpd-border-color);
+    text-align: right;
+}
+
+.wpd-table th {
+    background-color: #f9f9f9;
+}
+
+/* -----------------------------------------
+   7. استایل صفحه آرشیو و فیلترها
+   ----------------------------------------- */
+.wpd-archive-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    direction: rtl;
+}
+
+.wpd-archive-sidebar {
+    flex: 1 1 250px;
+    max-width: 100%;
+}
+
+#wpd-filter-form {
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px solid var(--wpd-border-color);
+    border-radius: 5px;
+}
+
+#wpd-filter-form h3 {
+    margin-top: 0;
+}
+
+.wpd-filter-group {
+    margin-bottom: 15px;
+}
+
+.wpd-filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.wpd-filter-group input,
+.wpd-filter-group select {
+    width: 100%;
+}
+
+#wpd-filter-form button {
+    width: 100%;
+}
+
+.wpd-archive-main {
+    flex: 1 1 65%;
+}
+
+#wpd-listings-result-container.loading {
+    opacity: 0.5;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* -----------------------------------------
+   8. استایل صفحه‌بندی
+   ----------------------------------------- */
+.navigation.pagination {
+    margin-top: 30px;
+    text-align: center;
+}
+
+.page-numbers {
+    display: inline-block;
+    padding: 5px 12px;
+    margin: 0 2px;
+    border: 1px solid var(--wpd-border-color);
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--wpd-primary-color);
+    background: #fff;
+}
+
+.page-numbers:hover,
+.page-numbers.current {
+    background: var(--wpd-primary-color);
+    color: #fff;
+    border-color: var(--wpd-primary-color);
+}
