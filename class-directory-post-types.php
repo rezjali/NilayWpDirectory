@@ -29,6 +29,15 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             add_action( 'manage_wpd_package_posts_custom_column', [ $this, 'render_package_columns' ], 10, 2 );
             add_filter( 'manage_wpd_upgrade_posts_columns', [ $this, 'add_upgrade_columns' ] );
             add_action( 'manage_wpd_upgrade_posts_custom_column', [ $this, 'render_upgrade_columns' ], 10, 2 );
+
+            // START OF NEW FEATURES: Hooks for new admin features
+            add_action( 'restrict_manage_posts', [ $this, 'add_listing_type_filter' ] );
+            add_filter( 'parse_query', [ $this, 'filter_listings_by_type' ] );
+            add_filter( 'bulk_actions-edit-wpd_listing', [ $this, 'add_listing_bulk_actions' ] );
+            add_filter( 'handle_bulk_actions-edit-wpd_listing', [ $this, 'handle_listing_bulk_actions' ], 10, 3 );
+            add_action( 'admin_init', [ $this, 'handle_field_builder_export' ] );
+            add_action( 'admin_notices', [ $this, 'bulk_action_admin_notice' ] );
+            // END OF NEW FEATURES
         }
 
         public function register_post_types() {
@@ -256,6 +265,18 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             wp_nonce_field( 'wpd_save_field_builder_meta', 'wpd_field_builder_nonce' );
             $fields = get_post_meta( $post->ID, '_wpd_custom_fields', true );
             if ( ! is_array( $fields ) ) $fields = [];
+            
+            // START OF NEW FEATURES: Import/Export UI
+            ?>
+            <div class="wpd-field-builder-actions" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
+                <a href="<?php echo esc_url(add_query_arg(['wpd_action' => 'export_fields', 'post_id' => $post->ID, '_wpnonce' => wp_create_nonce('wpd_export_fields_nonce')])); ?>" class="button"><?php _e('برون‌بری فیلدها', 'wp-directory'); ?></a>
+                <label for="wpd_import_fields_file" class="button"><?php _e('درون‌ریزی فیلدها', 'wp-directory'); ?></label>
+                <input type="file" id="wpd_import_fields_file" name="wpd_import_fields_file" accept=".json" style="display: none;">
+                <span class="description" style="margin-right: 10px;"><?php _e('برای درون‌ریزی، یک فایل JSON انتخاب و سپس نوع آگهی را ذخیره کنید.', 'wp-directory'); ?></span>
+            </div>
+            <?php
+            // END OF NEW FEATURES
+            
             ?>
             <div id="wpd-field-builder-wrapper">
                 <div id="wpd-fields-container" class="wpd-sortable-list">
@@ -286,11 +307,19 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             ]);
             $address_settings = $field_data['address_settings'] ?? [];
             $identity_settings = $field_data['identity_settings'] ?? [];
+            $product_settings = wp_parse_args($field_data['product_settings'] ?? [], [
+                'pricing_mode' => 'fixed',
+                'fixed_price' => '',
+                'enable_quantity' => 0,
+            ]);
             ?>
             <div class="wpd-field-row" data-index="<?php echo esc_attr($index); ?>" data-field-key="<?php echo esc_attr($key); ?>">
                 <div class="wpd-field-header">
                     <span class="dashicons dashicons-move handle"></span>
                     <strong><?php echo esc_html($label) ?: __('فیلد جدید', 'wp-directory'); ?></strong> (<span class="wpd-field-type-display"><?php echo esc_html($type); ?></span>)
+                    <!-- START OF NEW FEATURES: Copy Field Icon -->
+                    <a href="#" class="wpd-copy-field" title="<?php _e('کپی کردن فیلد', 'wp-directory'); ?>"><span class="dashicons dashicons-admin-page"></span></a>
+                    <!-- END OF NEW FEATURES -->
                     <a href="#" class="wpd-toggle-field-details"><?php _e('جزئیات', 'wp-directory'); ?></a>
                 </div>
                 <div class="wpd-field-details" style="display:none;">
@@ -305,6 +334,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 <option value="email" <?php selected( $type, 'email' ); ?>><?php _e( 'ایمیل', 'wp-directory' ); ?></option>
                                 <option value="url" <?php selected( $type, 'url' ); ?>><?php _e( 'وب‌سایت', 'wp-directory' ); ?></option>
                                 <option value="time" <?php selected( $type, 'time' ); ?>><?php _e( 'ساعت', 'wp-directory' ); ?></option>
+                                <option value="date" <?php selected( $type, 'date' ); ?>><?php _e( 'تاریخ', 'wp-directory' ); ?></option>
                             </optgroup>
                             <optgroup label="<?php _e('فیلدهای اعتبارسنجی', 'wp-directory'); ?>">
                                 <option value="mobile" <?php selected( $type, 'mobile' ); ?>><?php _e( 'شماره موبایل', 'wp-directory' ); ?></option>
@@ -328,6 +358,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 <option value="repeater" <?php selected( $type, 'repeater' ); ?>><?php _e( 'تکرار شونده', 'wp-directory' ); ?></option>
                                 <option value="social_networks" <?php selected( $type, 'social_networks' ); ?>><?php _e( 'لیست شبکه‌های اجتماعی', 'wp-directory' ); ?></option>
                                 <option value="simple_list" <?php selected( $type, 'simple_list' ); ?>><?php _e( 'فیلد لیستی', 'wp-directory' ); ?></option>
+                                <option value="product" <?php selected( $type, 'product' ); ?>><?php _e( 'محصول/خدمت', 'wp-directory' ); ?></option>
                             </optgroup>
                             <optgroup label="<?php _e('فیلدهای ترکیبی', 'wp-directory'); ?>">
                                 <option value="address" <?php selected( $type, 'address' ); ?>><?php _e( 'آدرس پستی', 'wp-directory' ); ?></option>
@@ -385,6 +416,27 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             echo '</div>';
                         }
                         ?>
+                    </div>
+                    
+                    <div class="wpd-field-settings-panel wpd-product-settings" style="<?php echo ($type === 'product') ? '' : 'display:none;'; ?>">
+                        <h4><?php _e('تنظیمات فیلد محصول/خدمت', 'wp-directory'); ?></h4>
+                        <div class="wpd-compound-sub-field-setting">
+                            <label><?php _e('حالت قیمت‌گذاری:', 'wp-directory'); ?></label>
+                            <select class="wpd-product-pricing-mode" name="wpd_fields[<?php echo esc_attr($index); ?>][product_settings][pricing_mode]">
+                                <option value="fixed" <?php selected('fixed', $product_settings['pricing_mode']); ?>><?php _e('قیمت ثابت', 'wp-directory'); ?></option>
+                                <option value="user_defined" <?php selected('user_defined', $product_settings['pricing_mode']); ?>><?php _e('قیمت توسط کاربر', 'wp-directory'); ?></option>
+                            </select>
+                        </div>
+                        <div class="wpd-compound-sub-field-setting wpd-product-fixed-price-wrapper" style="<?php echo $product_settings['pricing_mode'] === 'fixed' ? '' : 'display:none;'; ?>">
+                            <label><?php _e('قیمت ثابت:', 'wp-directory'); ?></label>
+                            <input type="number" name="wpd_fields[<?php echo esc_attr($index); ?>][product_settings][fixed_price]" value="<?php echo esc_attr($product_settings['fixed_price']); ?>" class="small-text">
+                        </div>
+                        <div class="wpd-compound-sub-field-setting">
+                            <label>
+                                <input type="checkbox" name="wpd_fields[<?php echo esc_attr($index); ?>][product_settings][enable_quantity]" value="1" <?php checked(1, $product_settings['enable_quantity']); ?>>
+                                <?php _e('فعال‌سازی انتخاب تعداد', 'wp-directory'); ?>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="wpd-field-rules">
@@ -520,6 +572,25 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( get_post_type($post_id) !== 'wpd_listing_type' ) return;
             if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
+            // START OF NEW FEATURES: Handle field builder import
+            if (isset($_FILES['wpd_import_fields_file']) && !empty($_FILES['wpd_import_fields_file']['tmp_name'])) {
+                if (!current_user_can('manage_options')) {
+                    return;
+                }
+                $file = $_FILES['wpd_import_fields_file'];
+                if ($file['type'] === 'application/json') {
+                    $content = file_get_contents($file['tmp_name']);
+                    $fields_data = json_decode($content, true);
+                    if (is_array($fields_data)) {
+                        $sanitized_fields = $this->sanitize_field_builder_data($fields_data);
+                        update_post_meta($post_id, '_wpd_custom_fields', $sanitized_fields);
+                        // We return here to avoid being overwritten by the regular save process below
+                        return;
+                    }
+                }
+            }
+            // END OF NEW FEATURES
+
             // Save main settings
             if ( isset( $_POST['wpd_listing_type_nonce'] ) && wp_verify_nonce( $_POST['wpd_listing_type_nonce'], 'wpd_save_listing_type_meta' ) ) {
                 if(isset($_POST['wpd_meta']) && is_array($_POST['wpd_meta'])) {
@@ -579,9 +650,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     $sanitized_taxs = [];
                     foreach ( $_POST['wpd_taxonomies'] as $tax ) {
                         if ( ! empty( $tax['name'] ) && ! empty( $tax['slug'] ) ) {
-                            // START OF CHANGE: Sanitize slug for URL-friendliness
                             $sanitized_taxs[] = [ 'name' => sanitize_text_field( $tax['name'] ), 'slug' => sanitize_title( $tax['slug'] ), 'hierarchical' => intval( $tax['hierarchical'] ) ];
-                            // END OF CHANGE
                         }
                     }
                     update_post_meta( $post_id, '_defined_taxonomies', $sanitized_taxs );
@@ -636,6 +705,14 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         ];
                     }
                 }
+                
+                if (isset($field['product_settings']) && is_array($field['product_settings'])) {
+                    $sanitized_field['product_settings'] = [
+                        'pricing_mode' => sanitize_text_field($field['product_settings']['pricing_mode']),
+                        'fixed_price'   => sanitize_text_field($field['product_settings']['fixed_price']),
+                        'enable_quantity' => isset($field['product_settings']['enable_quantity']) ? 1 : 0,
+                    ];
+                }
 
                 if ($sanitized_field['type'] === 'repeater' && !empty($field['sub_fields']) && is_array($field['sub_fields'])) {
                     $sanitized_field['sub_fields'] = $this->sanitize_field_builder_data($field['sub_fields']);
@@ -672,12 +749,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 $value_exists = isset($posted_data[$field_def['key']]);
                 $posted_value = $value_exists ? $posted_data[$field_def['key']] : null;
 
-                if (!$value_exists && in_array($field_def['type'], ['checkbox', 'multiselect'])) {
-                    delete_post_meta($post_id, $meta_key);
-                    continue;
-                }
-
                 if (!$value_exists) {
+                    if (in_array($field_def['type'], ['checkbox', 'multiselect', 'repeater', 'social_networks', 'simple_list', 'gallery', 'product'])) {
+                        delete_post_meta($post_id, $meta_key);
+                    }
                     continue;
                 }
 
@@ -699,13 +774,29 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             } else { 
                                 $sanitized_row = array_map('sanitize_text_field', $row_data);
                             }
-
-                            if (!empty(array_filter($sanitized_row))) {
+                            
+                            $is_valid_row = false;
+                            if ($field_def['type'] === 'social_networks') {
+                                if (!empty($sanitized_row['url'])) {
+                                    $is_valid_row = true;
+                                }
+                            } else {
+                                if (!empty(array_filter($sanitized_row))) {
+                                    $is_valid_row = true;
+                                }
+                            }
+    
+                            if ($is_valid_row) {
                                 $repeater_data[] = $sanitized_row;
                             }
                         }
                     }
-                    update_post_meta($post_id, $meta_key, $repeater_data);
+                    
+                    if (empty($repeater_data)) {
+                        delete_post_meta($post_id, $meta_key);
+                    } else {
+                        update_post_meta($post_id, $meta_key, $repeater_data);
+                    }
                 } elseif (in_array($field_def['type'], ['address', 'identity'])) {
                     $sanitized_value = is_array($posted_value) ? array_map('sanitize_text_field', $posted_value) : sanitize_text_field($posted_value);
                     update_post_meta($post_id, $meta_key, $sanitized_value);
@@ -737,6 +828,15 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 case 'postal_code':
                 case 'national_id':
                     return sanitize_text_field(preg_replace('/[^0-9]/', '', $value));
+                case 'date':
+                    return sanitize_text_field($value);
+                case 'product':
+                    if (!is_array($value)) return null;
+                    return [
+                        'selected' => isset($value['selected']) ? 1 : 0,
+                        'quantity' => isset($value['quantity']) ? absint($value['quantity']) : 1,
+                        'price'    => isset($value['price']) ? sanitize_text_field($value['price']) : 0,
+                    ];
                 case 'map':
                 case 'text':
                 case 'select':
@@ -767,6 +867,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 wp_enqueue_media();
                 wp_enqueue_script('jquery-ui-sortable');
 
+                wp_enqueue_script('jquery-ui-datepicker');
+                wp_enqueue_style('jquery-ui-style', 'https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css');
+
                 wp_enqueue_style('leaflet-css', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
                 wp_enqueue_script('leaflet-js', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js', [], '1.7.1', true);
 
@@ -785,7 +888,8 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     .wpd-field-row { margin-bottom: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;}
                     .wpd-field-header { display: flex; align-items: center; padding: 10px; gap: 10px; }
                     .wpd-field-header .handle { cursor: move; color: #888; }
-                    .wpd-field-header .wpd-toggle-field-details { margin-left: auto; text-decoration: none; }
+                    .wpd-field-header .wpd-toggle-field-details, .wpd-field-header .wpd-copy-field { margin-left: auto; text-decoration: none; }
+                    .wpd-field-header .wpd-copy-field { margin-left: 10px; }
                     .wpd-field-details { padding: 10px; border-top: 1px solid #ddd; }
                     .wpd-field-inputs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
                     .wpd-field-inputs input, .wpd-field-inputs select, .wpd-field-inputs textarea { margin: 0; }
@@ -807,6 +911,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             $details.find('.wpd-repeater-fields-wrapper').toggle(fieldType === 'repeater');
                             $details.find('.wpd-address-settings').toggle(fieldType === 'address');
                             $details.find('.wpd-identity-settings').toggle(fieldType === 'identity');
+                            $details.find('.wpd-product-settings').toggle(fieldType === 'product');
                         }
 
                         function initSortable() {
@@ -847,6 +952,11 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             });
                         }
 
+                        function getNewIndex() {
+                            var container = $('#wpd-fields-container');
+                            return container.children().length ? (Math.max.apply(null, container.children().map(function() { return $(this).data('index'); }).get()) + 1) : 0;
+                        }
+
                         $('#wpd-field-builder-wrapper').on('change', '.wpd-field-type-selector', function() {
                             toggleOptionsField(this);
                             $(this).closest('.wpd-field-row').find('.wpd-field-type-display').text($(this).val());
@@ -861,7 +971,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             updateConditionalFieldDropdowns();
                         });
                         $('#wpd-field-builder-wrapper').on('keyup', '.field-key-input', function() {
-                            $(this).closest('.wpd-field-row').data('field-key', $(this).val());
+                            var newKey = $(this).val().replace(/[^a-z0-9_]/gi, '').toLowerCase();
+                            $(this).val(newKey);
+                            $(this).closest('.wpd-field-row').data('field-key', newKey);
                             updateConditionalFieldDropdowns();
                         });
 
@@ -875,13 +987,38 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
 
                         $('#wpd-add-field').on('click', function(e) {
                             e.preventDefault();
-                            var container = $('#wpd-fields-container');
-                            var newIndex = container.children().length ? (Math.max.apply(null, container.children().map(function() { return $(this).data('index'); }).get()) + 1) : 0;
+                            var newIndex = getNewIndex();
                             var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__', [], $fields)); ?>.replace(/__INDEX__/g, newIndex));
                             field_html.find('.wpd-field-details').show();
-                            container.append(field_html);
+                            $('#wpd-fields-container').append(field_html);
                             updateConditionalFieldDropdowns();
                         });
+
+                        // START OF NEW FEATURES: Copy Field JS
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-copy-field', function(e) {
+                            e.preventDefault();
+                            var $originalRow = $(this).closest('.wpd-field-row');
+                            var $clonedRow = $originalRow.clone();
+                            var newIndex = getNewIndex();
+                            
+                            $clonedRow.attr('data-index', newIndex);
+                            $clonedRow.find('[name]').each(function() {
+                                this.name = this.name.replace(/\[\d+\]/, '[' + newIndex + ']');
+                            });
+
+                            var oldKey = $clonedRow.find('.field-key-input').val();
+                            var newKey = oldKey + '_copy';
+                            $clonedRow.find('.field-key-input').val(newKey);
+                            $clonedRow.attr('data-field-key', newKey);
+
+                            var oldLabel = $clonedRow.find('.field-label-input').val();
+                            $clonedRow.find('.field-label-input').val(oldLabel + ' (کپی)');
+                            $clonedRow.find('.wpd-field-header strong').text(oldLabel + ' (کپی)');
+
+                            $clonedRow.insertAfter($originalRow);
+                            updateConditionalFieldDropdowns();
+                        });
+                        // END OF NEW FEATURES
 
                         $('#wpd-field-builder-wrapper').on('click', '.wpd-add-sub-field', function(e) {
                             e.preventDefault();
@@ -906,6 +1043,11 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             } else {
                                 $valueInput.show();
                             }
+                        });
+                        
+                        $('#wpd-field-builder-wrapper').on('change', '.wpd-product-pricing-mode', function() {
+                            var mode = $(this).val();
+                            $(this).closest('.wpd-product-settings').find('.wpd-product-fixed-price-wrapper').toggle(mode === 'fixed');
                         });
 
                         $('form#post').on('submit', function(e){
@@ -976,6 +1118,12 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     .wpd-gallery-field-wrapper .gallery-preview .remove-image { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; text-align: center; line-height: 20px; }
                     .wpd-repeater-row, .wpd-compound-field-row { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; background: #fdfdfd; }
                     .wpd-repeater-row-actions { margin-top: 10px; text-align: left; }
+                    .ui-datepicker {
+                        direction: rtl;
+                    }
+                    .ui-datepicker-header {
+                        direction: ltr;
+                    }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
@@ -1040,6 +1188,59 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 map.on('click', function(e) { marker.setLatLng(e.latlng); input.val(e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6)); });
                                 setTimeout(function() { map.invalidateSize() }, 200);
                             });
+                            
+                            container.find('.wpd-date-picker:not([data-initialized])').each(function() {
+                                $(this).attr('data-initialized', 'true').datepicker({
+                                    dateFormat: 'yy-mm-dd'
+                                });
+                            });
+                        }
+                        
+                        function checkAdminConditionalLogic() {
+                            $('.wpd-admin-field-wrapper[data-conditional-logic]').each(function () {
+                                var $dependentFieldWrapper = $(this);
+                                var logic;
+                                try {
+                                    logic = JSON.parse($dependentFieldWrapper.attr('data-conditional-logic'));
+                                } catch (e) { return; }
+
+                                if (!logic.enabled || !logic.target_field) return;
+
+                                var $targetFieldWrapper = $('.wpd-admin-field-wrapper[data-field-key="' + logic.target_field + '"]');
+                                var $targetField = $targetFieldWrapper.find('[name^="wpd_custom[' + logic.target_field + ']"]');
+                                
+                                if (!$targetField.length) return;
+
+                                var targetValue;
+                                if ($targetField.is(':radio') || $targetField.is(':checkbox')) {
+                                    targetValue = $targetField.filter(':checked').val() || '';
+                                } else {
+                                    targetValue = $targetField.val() || '';
+                                }
+
+                                var conditionMet = false;
+                                switch (logic.operator) {
+                                    case 'is': conditionMet = (targetValue == logic.value); break;
+                                    case 'is_not': conditionMet = (targetValue != logic.value); break;
+                                    case 'is_empty': conditionMet = (targetValue === '' || targetValue === null || (Array.isArray(targetValue) && targetValue.length === 0)); break;
+                                    case 'is_not_empty': conditionMet = (targetValue !== '' && targetValue !== null && (!Array.isArray(targetValue) || targetValue.length > 0)); break;
+                                }
+
+                                var shouldShow = (logic.action === 'show') ? conditionMet : !conditionMet;
+
+                                if (shouldShow) {
+                                    $dependentFieldWrapper.slideDown('fast');
+                                } else {
+                                    $dependentFieldWrapper.slideUp('fast');
+                                }
+                            });
+                        }
+
+                        function initializeAdminConditionalLogic(container) {
+                            container.find('input, select, textarea').off('change.wpd_conditional').on('change.wpd_conditional', function() {
+                                setTimeout(checkAdminConditionalLogic, 50);
+                            });
+                            checkAdminConditionalLogic();
                         }
 
                         $('#wpd_listing_type_selector').on('change', function() {
@@ -1062,6 +1263,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                     if(response.success) {
                                         fields_container.html(response.data.fields);
                                         initializeWpdComponents(fields_container);
+                                        initializeAdminConditionalLogic(fields_container);
                                     } else {
                                         fields_container.html('<p style="color:red;">' + response.data.message + '</p>');
                                     }
@@ -1089,7 +1291,17 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             initializeWpdComponents(newRow);
                         });
 
+                        $('#wpd-admin-custom-fields-wrapper').on('change', '.wpd-product-admin-wrapper input[type="checkbox"]', function() {
+                            $(this).closest('.wpd-product-admin-wrapper').find('.wpd-product-details').slideToggle($(this).is(':checked'));
+                        });
+                        $('.wpd-product-admin-wrapper input[type="checkbox"]').each(function() {
+                            if (!$(this).is(':checked')) {
+                                $(this).closest('.wpd-product-admin-wrapper').find('.wpd-product-details').hide();
+                            }
+                        });
+
                         initializeWpdComponents($(document.body));
+                        initializeAdminConditionalLogic($('#wpd-admin-custom-fields-wrapper'));
                     });
                 </script>
                 <?php
@@ -1143,18 +1355,26 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 
                 $width_class = 'wpd-admin-field-col-' . ($field['width_class'] ?? 'full');
 
+                $conditional_logic = $field['conditional_logic'] ?? [];
+                $wrapper_attributes = 'data-field-key="' . esc_attr($field_key) . '"';
+                if (!empty($conditional_logic['enabled'])) {
+                    $wrapper_attributes .= ' data-conditional-logic=\'' . json_encode($conditional_logic) . '\'';
+                }
+
                 if ($field['type'] === 'section_title') {
-                    echo '<div class="wpd-admin-field-wrapper wpd-admin-field-col-full"><h3 class="wpd-section-title">' . esc_html($field['label']) . '</h3></div>';
+                    echo '<div class="wpd-admin-field-wrapper wpd-admin-field-col-full" ' . $wrapper_attributes . '><h3 class="wpd-section-title">' . esc_html($field['label']) . '</h3></div>';
                     continue;
                 }
                 if ($field['type'] === 'html_content') {
-                    echo '<div class="wpd-admin-field-wrapper wpd-admin-field-col-full">' . wp_kses_post($field['options']) . '</div>';
+                    echo '<div class="wpd-admin-field-wrapper wpd-admin-field-col-full" ' . $wrapper_attributes . '>' . wp_kses_post($field['options']) . '</div>';
                     continue;
                 }
 
                 ?>
-                <div class="wpd-admin-field-wrapper <?php echo esc_attr($width_class); ?>">
+                <div class="wpd-admin-field-wrapper <?php echo esc_attr($width_class); ?>" <?php echo $wrapper_attributes; ?>>
+                    <?php if ($field['type'] !== 'product'): ?>
                     <label for="<?php echo esc_attr($field_id); ?>"><?php echo esc_html($field['label']); ?></label>
+                    <?php endif; ?>
                     <div class="wpd-field-input-wrapper">
                         <?php
                         $options = !empty($field['options']) ? array_map('trim', explode(',', $field['options'])) : [];
@@ -1182,6 +1402,51 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             
                             case 'time':
                                 echo '<input type="time" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text" style="direction: ltr;">';
+                                break;
+                            
+                            case 'date':
+                                echo '<input type="text" id="' . esc_attr($field_id) . '" name="' . esc_attr($field_name) . '" value="' . esc_attr($value) . '" class="regular-text wpd-date-picker" autocomplete="off">';
+                                break;
+
+                            case 'product':
+                                $product_settings = $field['product_settings'] ?? [];
+                                $product_value = is_array($value) ? $value : ['selected' => 0, 'quantity' => 1, 'price' => ''];
+                                $is_selected = !empty($product_value['selected']);
+                                ?>
+                                <div class="wpd-product-admin-wrapper">
+                                    <label>
+                                        <input type="checkbox" name="<?php echo esc_attr($field_name); ?>[selected]" value="1" <?php checked(1, $is_selected); ?>>
+                                        <strong><?php echo esc_html($field['label']); ?></strong>
+                                    </label>
+                                    <div class="wpd-product-details" style="margin-top: 10px; padding: 10px; border: 1px solid #e0e0e0; background: #fafafa;">
+                                        
+                                        <p>
+                                            <label for="<?php echo esc_attr($field_id); ?>_quantity"><?php _e('تعداد:', 'wp-directory'); ?></label>
+                                            <input id="<?php echo esc_attr($field_id); ?>_quantity" type="number" name="<?php echo esc_attr($field_name); ?>[quantity]" value="<?php echo esc_attr($product_value['quantity']); ?>" class="small-text">
+                                            <?php if (empty($product_settings['enable_quantity'])): ?>
+                                                <small>(<?php _e('برای کاربران غیرفعال است', 'wp-directory'); ?>)</small>
+                                            <?php endif; ?>
+                                        </p>
+                                        
+                                        <p>
+                                            <label for="<?php echo esc_attr($field_id); ?>_price">
+                                                <?php 
+                                                if ($product_settings['pricing_mode'] === 'user_defined') {
+                                                    _e('قیمت:', 'wp-directory');
+                                                } else {
+                                                    _e('قیمت (ثابت):', 'wp-directory');
+                                                }
+                                                ?>
+                                            </label>
+                                            <input id="<?php echo esc_attr($field_id); ?>_price" type="number" name="<?php echo esc_attr($field_name); ?>[price]" value="<?php echo esc_attr($product_value['price'] ?: ($product_settings['fixed_price'] ?? '')); ?>" class="regular-text" <?php if ($product_settings['pricing_mode'] === 'fixed') echo 'readonly'; ?>>
+                                             <?php if ($product_settings['pricing_mode'] === 'fixed'): ?>
+                                                <small>(<?php _e('در فیلدساز تعریف شده', 'wp-directory'); ?>)</small>
+                                            <?php endif; ?>
+                                        </p>
+
+                                    </div>
+                                </div>
+                                <?php
                                 break;
 
                             case 'gallery':
@@ -1370,5 +1635,93 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     break;
             }
         }
+
+        // START OF NEW FEATURES: New functions for admin features
+
+        public function add_listing_type_filter($post_type) {
+            if ('wpd_listing' !== $post_type) {
+                return;
+            }
+            $listing_types = get_posts(['post_type' => 'wpd_listing_type', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC']);
+            if (empty($listing_types)) {
+                return;
+            }
+            $current_filter = $_GET['wpd_listing_type_filter'] ?? '';
+            ?>
+            <select name="wpd_listing_type_filter" id="wpd_listing_type_filter">
+                <option value=""><?php _e('همه انواع آگهی', 'wp-directory'); ?></option>
+                <?php foreach ($listing_types as $type): ?>
+                    <option value="<?php echo esc_attr($type->ID); ?>" <?php selected($current_filter, $type->ID); ?>>
+                        <?php echo esc_html($type->post_title); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <?php
+        }
+
+        public function filter_listings_by_type($query) {
+            global $pagenow;
+            if (is_admin() && $pagenow === 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'wpd_listing' && isset($_GET['wpd_listing_type_filter']) && !empty($_GET['wpd_listing_type_filter'])) {
+                $query->set('meta_key', '_wpd_listing_type');
+                $query->set('meta_value', intval($_GET['wpd_listing_type_filter']));
+            }
+        }
+
+        public function add_listing_bulk_actions($bulk_actions) {
+            $bulk_actions['wpd_approve'] = __('تایید آگهی‌ها', 'wp-directory');
+            $bulk_actions['wpd_reject'] = __('رد کردن آگهی‌ها (بازگشت به در انتظار)', 'wp-directory');
+            return $bulk_actions;
+        }
+
+        public function handle_listing_bulk_actions($redirect_to, $action, $post_ids) {
+            if ($action !== 'wpd_approve' && $action !== 'wpd_reject') {
+                return $redirect_to;
+            }
+
+            $count = 0;
+            foreach ($post_ids as $post_id) {
+                if ($action === 'wpd_approve') {
+                    wp_update_post(['ID' => $post_id, 'post_status' => 'publish']);
+                } else { // wpd_reject
+                    wp_update_post(['ID' => $post_id, 'post_status' => 'pending']);
+                }
+                $count++;
+            }
+
+            $message = ($action === 'wpd_approve') ? 'approved' : 'rejected';
+            $redirect_to = add_query_arg(['bulk_action_completed' => $message, 'ids' => implode(',', $post_ids)], $redirect_to);
+            return $redirect_to;
+        }
+
+        public function bulk_action_admin_notice() {
+            if (!empty($_REQUEST['bulk_action_completed'])) {
+                $count = isset($_REQUEST['ids']) ? count(explode(',', $_REQUEST['ids'])) : 0;
+                $message = '';
+                if ($_REQUEST['bulk_action_completed'] === 'approved') {
+                    $message = sprintf(_n('%d آگهی تایید و منتشر شد.', '%d آگهی تایید و منتشر شدند.', $count, 'wp-directory'), $count);
+                } elseif ($_REQUEST['bulk_action_completed'] === 'rejected') {
+                    $message = sprintf(_n('%d آگهی به وضعیت "در انتظار تایید" بازگشت.', '%d آگهی به وضعیت "در انتظار تایید" بازگشتند.', $count, 'wp-directory'), $count);
+                }
+                echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($message) . '</p></div>';
+            }
+        }
+
+        public function handle_field_builder_export() {
+            if (isset($_GET['wpd_action'], $_GET['post_id'], $_GET['_wpnonce']) && $_GET['wpd_action'] === 'export_fields') {
+                if (!wp_verify_nonce($_GET['_wpnonce'], 'wpd_export_fields_nonce') || !current_user_can('manage_options')) {
+                    wp_die('شما اجازه انجام این کار را ندارید.');
+                }
+                $post_id = intval($_GET['post_id']);
+                $fields = get_post_meta($post_id, '_wpd_custom_fields', true);
+                $post = get_post($post_id);
+                $filename = 'wpd-fields-' . ($post ? $post->post_name : $post_id) . '-' . date('Y-m-d') . '.json';
+
+                header('Content-Type: application/json');
+                header('Content-Disposition: attachment; filename=' . $filename);
+                wp_send_json($fields, 200);
+                exit;
+            }
+        }
+        // END OF NEW FEATURES
     }
 }

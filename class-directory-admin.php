@@ -89,7 +89,7 @@ class WPD_Transactions_List_Table extends WP_List_Table {
             case 'amount': return number_format( $item[ $column_name ] );
             case 'user_id':
                 $user = get_userdata( $item[ $column_name ] );
-                return $user ? $user->display_name : __( 'کاربر حذف شده', 'wp-directory' );
+                return $user ? '<a href="' . get_edit_user_link($user->ID) . '">' . esc_html($user->display_name) . '</a>' : __( 'کاربر حذف شده', 'wp-directory' );
             case 'status':
                 $status = $item[$column_name];
                 $status_label = '';
@@ -128,6 +128,10 @@ class Directory_Admin {
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_scripts' ] );
         add_action( 'wp_ajax_wpd_verify_service', [ $this, 'ajax_verify_service' ] );
+
+        add_action( 'wp_dashboard_setup', [ $this, 'add_dashboard_widget' ] );
+        add_action( 'admin_init', [ $this, 'handle_manual_transaction_submission' ] );
+        add_action( 'admin_init', [ $this, 'handle_tools_actions' ] );
     }
 
     public function add_admin_menu() {
@@ -136,6 +140,10 @@ class Directory_Admin {
         add_submenu_page( 'wpd-main-menu', __( 'بسته‌های عضویت', 'wp-directory' ), __( 'بسته‌های عضویت', 'wp-directory' ), 'manage_options', 'edit.php?post_type=wpd_package' );
         add_submenu_page( 'wpd-main-menu', __( 'بسته‌های ارتقا', 'wp-directory' ), __( 'بسته‌های ارتقا', 'wp-directory' ), 'manage_options', 'edit.php?post_type=wpd_upgrade' );
         $hook = add_submenu_page( 'wpd-main-menu', __( 'تراکنش‌ها', 'wp-directory' ), __( 'تراکنش‌ها', 'wp-directory' ), 'manage_options', 'wpd-transactions', [ $this, 'render_transactions_page' ] );
+        
+        add_submenu_page( 'wpd-main-menu', __( 'گزارشات', 'wp-directory' ), __( 'گزارشات', 'wp-directory' ), 'manage_options', 'wpd-reports', [ $this, 'render_reports_page' ] );
+        add_submenu_page( 'wpd-main-menu', __( 'ابزارها', 'wp-directory' ), __( 'ابزارها', 'wp-directory' ), 'manage_options', 'wpd-tools', [ $this, 'render_tools_page' ] );
+        
         add_action( "load-$hook", [ $this, 'screen_options' ] );
     }
 
@@ -145,14 +153,16 @@ class Directory_Admin {
             wp_add_inline_style('common', $css);
         }
         
-        if ( $hook !== 'toplevel_page_wpd-main-menu' ) {
-            return;
+        if ( strpos($hook, 'wpd-') !== false ) {
+            wp_enqueue_style( 'wp-color-picker' );
+            wp_enqueue_script( 'wp-color-picker' );
+            
+            if ($hook === 'نیلای-دایرکتوری_page_wpd-reports') {
+                wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.1', true);
+            }
+            
+            wp_add_inline_script( 'jquery-core', $this->get_settings_page_js() );
         }
-
-        wp_enqueue_style( 'wp-color-picker' );
-        wp_enqueue_script( 'wp-color-picker' );
-        
-        wp_add_inline_script( 'wp-color-picker', $this->get_settings_page_js() );
     }
 
     public function render_settings_page() {
@@ -191,9 +201,19 @@ class Directory_Admin {
     }
 
     public function render_transactions_page(){
+        $action = $_GET['action'] ?? 'list';
+
+        if ($action === 'add_new') {
+            $this->render_add_transaction_page();
+            return;
+        }
+
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php _e( 'تراکنش‌ها', 'wp-directory' ); ?></h1>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=wpd-transactions&action=add_new')); ?>" class="page-title-action"><?php _e('افزودن تراکنش دستی', 'wp-directory'); ?></a>
+            <hr class="wp-header-end">
+
             <form method="get">
                 <input type="hidden" name="page" value="<?php echo esc_attr($_REQUEST['page']); ?>" />
                 <?php
@@ -575,21 +595,35 @@ class Directory_Admin {
         return <<<'JS'
             jQuery(document).ready(function($){
                 // General Tabs
-                var activeTab = window.location.hash.replace('#', '');
-                if (activeTab === '' || $('.wpd-nav-tab-wrapper .nav-tab[data-tab="' + activeTab + '"]').length === 0) {
-                    activeTab = $('.wpd-nav-tab-wrapper .nav-tab:first').data('tab');
-                }
-                $('.wpd-nav-tab-wrapper .nav-tab[data-tab="' + activeTab + '"]').addClass('nav-tab-active');
-                $('#tab-' + activeTab).addClass('active');
-                $('.wpd-nav-tab-wrapper .nav-tab').click(function(e){
-                    e.preventDefault();
-                    var tab_id = $(this).data('tab');
-                    $('.wpd-nav-tab-wrapper .nav-tab').removeClass('nav-tab-active');
+                function handleTabs() {
+                    var $tabWrapper = $('.nav-tab-wrapper');
+                    if (!$tabWrapper.length) return;
+
+                    var activeTab = window.location.hash.replace('#', '');
+                    if (activeTab === '' || $tabWrapper.find('.nav-tab[data-tab="' + activeTab + '"]').length === 0) {
+                        activeTab = $tabWrapper.find('.nav-tab:first').data('tab');
+                    }
+                    
+                    $tabWrapper.find('.nav-tab').removeClass('nav-tab-active');
                     $('.wpd-settings-tab').removeClass('active');
-                    $(this).addClass('nav-tab-active');
-                    $('#tab-' + tab_id).addClass('active');
-                    window.location.hash = tab_id;
-                });
+                    
+                    $tabWrapper.find('.nav-tab[data-tab="' + activeTab + '"]').addClass('nav-tab-active');
+                    $('#tab-' + activeTab).addClass('active');
+
+                    $tabWrapper.find('.nav-tab').off('click').on('click', function(e){
+                        e.preventDefault();
+                        var tab_id = $(this).data('tab');
+                        
+                        $tabWrapper.find('.nav-tab').removeClass('nav-tab-active');
+                        $('.wpd-settings-tab').removeClass('active');
+                        
+                        $(this).addClass('nav-tab-active');
+                        $('#tab-' + tab_id).addClass('active');
+                        
+                        window.location.hash = tab_id;
+                    });
+                }
+                handleTabs();
 
                 // Color Picker
                 $('.wpd-color-picker').wpColorPicker();
@@ -707,6 +741,360 @@ JS;
             wp_send_json_success(['message' => $result['message']]);
         } else {
             wp_send_json_error(['message' => $result['message']]);
+        }
+    }
+
+    // START OF NEW FEATURES: All new functions for added features
+
+    /**
+     * Adds the dashboard widget.
+     */
+    public function add_dashboard_widget() {
+        wp_add_dashboard_widget(
+            'wpd_dashboard_widget',
+            'خلاصه وضعیت نیلای دایرکتوری',
+            [ $this, 'render_dashboard_widget' ]
+        );
+    }
+
+    /**
+     * Renders the content of the dashboard widget.
+     */
+    public function render_dashboard_widget() {
+        global $wpdb;
+        $currency = Directory_Main::get_option('general', ['currency' => 'تومان'])['currency'];
+
+        // Pending listings count
+        $pending_count = get_posts(['post_type' => 'wpd_listing', 'post_status' => 'pending', 'fields' => 'ids', 'posts_per_page' => -1]);
+        $pending_count = count($pending_count);
+
+        // This month's revenue
+        $start_of_month = date('Y-m-01 00:00:00');
+        $revenue = $wpdb->get_var($wpdb->prepare(
+            "SELECT SUM(amount) FROM {$wpdb->prefix}wpd_transactions WHERE status = 'completed' AND created_at >= %s",
+            $start_of_month
+        ));
+
+        // Recent transactions
+        $recent_transactions = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}wpd_transactions ORDER BY created_at DESC LIMIT 5");
+
+        ?>
+        <div class="wpd-dashboard-widget">
+            <div class="wpd-widget-stats">
+                <div class="wpd-stat-item">
+                    <strong><?php echo esc_html($pending_count); ?></strong>
+                    <span><a href="<?php echo admin_url('edit.php?post_status=pending&post_type=wpd_listing'); ?>"><?php _e('آگهی در انتظار تایید', 'wp-directory'); ?></a></span>
+                </div>
+                <div class="wpd-stat-item">
+                    <strong><?php echo esc_html(number_format($revenue ?? 0)); ?></strong>
+                    <span><?php printf(__('درآمد این ماه (%s)', 'wp-directory'), $currency); ?></span>
+                </div>
+            </div>
+            <hr>
+            <h4><?php _e('آخرین تراکنش‌ها', 'wp-directory'); ?></h4>
+            <?php if (!empty($recent_transactions)): ?>
+            <ul class="wpd-recent-transactions">
+                <?php foreach ($recent_transactions as $tx): ?>
+                <li>
+                    <span class="wpd-status-<?php echo esc_attr($tx->status); ?>"><?php echo esc_html($tx->status); ?></span> - 
+                    <?php echo esc_html(number_format($tx->amount)); ?> <?php echo esc_html($currency); ?> - 
+                    <small><?php echo date_i18n('Y/m/d', strtotime($tx->created_at)); ?></small>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php else: ?>
+            <p><?php _e('هیچ تراکنشی یافت نشد.', 'wp-directory'); ?></p>
+            <?php endif; ?>
+        </div>
+        <style>
+            .wpd-widget-stats { display: flex; justify-content: space-around; text-align: center; padding: 10px 0; }
+            .wpd-stat-item strong { font-size: 24px; display: block; }
+            .wpd-recent-transactions { margin: 0; padding: 0; list-style: none; }
+            .wpd-recent-transactions li { border-bottom: 1px solid #eee; padding: 5px 0; }
+        </style>
+        <?php
+    }
+
+    /**
+     * Renders the Reports page.
+     */
+    public function render_reports_page() {
+        global $wpdb;
+        $currency = Directory_Main::get_option('general', ['currency' => 'تومان'])['currency'];
+        
+        // General Stats
+        $total_revenue = $wpdb->get_var("SELECT SUM(amount) FROM {$wpdb->prefix}wpd_transactions WHERE status = 'completed'");
+        $total_transactions = $wpdb->get_var("SELECT COUNT(id) FROM {$wpdb->prefix}wpd_transactions WHERE status = 'completed'");
+        $total_listings = wp_count_posts('wpd_listing')->publish;
+
+        // Monthly Revenue for Chart
+        $monthly_revenue = $wpdb->get_results(
+            "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total
+            FROM {$wpdb->prefix}wpd_transactions
+            WHERE status = 'completed' AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            GROUP BY month ORDER BY month ASC"
+        );
+
+        $chart_labels = [];
+        $chart_data = [];
+        if ($monthly_revenue) {
+            foreach ($monthly_revenue as $row) {
+                $chart_labels[] = date_i18n('F Y', strtotime($row->month . '-01'));
+                $chart_data[] = $row->total;
+            }
+        }
+
+        // Listings per Type
+        $listings_per_type_raw = $wpdb->get_results(
+            "SELECT p.post_title, COUNT(pm.post_id) as count
+            FROM {$wpdb->postmeta} pm
+            JOIN {$wpdb->posts} p ON pm.meta_value = p.ID
+            WHERE pm.meta_key = '_wpd_listing_type'
+            GROUP BY pm.meta_value"
+        );
+        ?>
+        <div class="wrap">
+            <h1><?php _e('گزارشات نیلای دایرکتوری', 'wp-directory'); ?></h1>
+            <div id="wpd-reports-overview" class="wpd-reports-row">
+                <div class="wpd-report-card"><h3><?php _e('درآمد کل', 'wp-directory'); ?></h3><p><?php echo esc_html(number_format($total_revenue ?? 0)); ?> <?php echo esc_html($currency); ?></p></div>
+                <div class="wpd-report-card"><h3><?php _e('تراکنش‌های موفق', 'wp-directory'); ?></h3><p><?php echo esc_html(number_format($total_transactions ?? 0)); ?></p></div>
+                <div class="wpd-report-card"><h3><?php _e('کل آگهی‌های فعال', 'wp-directory'); ?></h3><p><?php echo esc_html(number_format($total_listings ?? 0)); ?></p></div>
+            </div>
+            <div id="wpd-reports-main" class="wpd-reports-row">
+                <div class="wpd-report-card main-chart">
+                    <h3><?php _e('درآمد ۶ ماه اخیر', 'wp-directory'); ?></h3>
+                    <canvas id="revenueChart"></canvas>
+                </div>
+                <div class="wpd-report-card">
+                    <h3><?php _e('آگهی‌ها بر اساس نوع', 'wp-directory'); ?></h3>
+                    <table class="widefat striped">
+                        <thead><tr><th><?php _e('نوع آگهی', 'wp-directory'); ?></th><th><?php _e('تعداد', 'wp-directory'); ?></th></tr></thead>
+                        <tbody>
+                            <?php if (!empty($listings_per_type_raw)): foreach ($listings_per_type_raw as $row): ?>
+                                <tr><td><?php echo esc_html($row->post_title); ?></td><td><?php echo esc_html(number_format($row->count)); ?></td></tr>
+                            <?php endforeach; else: ?>
+                                <tr><td colspan="2"><?php _e('داده‌ای یافت نشد.', 'wp-directory'); ?></td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <style>
+            .wpd-reports-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
+            .wpd-report-card { background: #fff; padding: 20px; border: 1px solid #ddd; }
+            .wpd-report-card h3 { margin-top: 0; }
+            .wpd-report-card p { font-size: 24px; margin: 0; font-weight: bold; color: #0073aa; }
+            .wpd-report-card.main-chart { grid-column: 1 / -1; }
+            @media (min-width: 782px) { .wpd-report-card.main-chart { grid-column: 1 / 3; } }
+        </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var ctx = document.getElementById('revenueChart').getContext('2d');
+                var revenueChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: <?php echo json_encode($chart_labels); ?>,
+                        datasets: [{
+                            label: '<?php printf(__('درآمد (%s)', 'wp-directory'), $currency); ?>',
+                            data: <?php echo json_encode($chart_data); ?>,
+                            backgroundColor: 'rgba(0, 115, 170, 0.5)',
+                            borderColor: 'rgba(0, 115, 170, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: { y: { beginAtZero: true } },
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * Renders the Tools page with System Status.
+     */
+    public function render_tools_page() {
+        ?>
+        <div class="wrap">
+            <h1><?php _e('ابزارها و وضعیت سیستم', 'wp-directory'); ?></h1>
+            <h2 class="nav-tab-wrapper">
+                <a href="#system-status" data-tab="system-status" class="nav-tab"><?php _e('وضعیت سیستم', 'wp-directory'); ?></a>
+                <a href="#tools" data-tab="tools" class="nav-tab"><?php _e('ابزارها', 'wp-directory'); ?></a>
+            </h2>
+
+            <div id="tab-system-status" class="wpd-settings-tab">
+                <?php $this->render_system_status_content(); ?>
+            </div>
+
+            <div id="tab-tools" class="wpd-settings-tab">
+                <?php $this->render_tools_content(); ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    private function render_system_status_content() {
+        if (!method_exists('Directory_Main', 'get_system_status_info')) {
+            echo '<div class="notice notice-error"><p>' . __('خطا: لطفاً فایل class-directory-main.php را نیز بروزرسانی کنید تا این بخش به درستی کار کند.', 'wp-directory') . '</p></div>';
+            return;
+        }
+        $status = Directory_Main::get_system_status_info();
+        ?>
+        <table class="widefat" cellspacing="0" style="margin-top:20px;">
+            <thead>
+                <tr>
+                    <th colspan="2"><b><?php _e('محیط وردپرس', 'wp-directory'); ?></b></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($status['wp'] as $name => $value): ?>
+                <tr>
+                    <td style="width: 250px;"><?php echo esc_html($name); ?>:</td>
+                    <td><?php echo wp_kses_post($value); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+            <thead>
+                <tr>
+                    <th colspan="2"><b><?php _e('محیط سرور', 'wp-directory'); ?></b></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($status['server'] as $name => $value): ?>
+                <tr>
+                    <td><?php echo esc_html($name); ?>:</td>
+                    <td><?php echo wp_kses_post($value); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php
+    }
+
+    private function render_tools_content() {
+        ?>
+        <h3 style="margin-top:20px;"><?php _e('ابزارهای نگهداری', 'wp-directory'); ?></h3>
+        <table class="form-table">
+            <tr>
+                <th><?php _e('پاک کردن کش افزونه', 'wp-directory'); ?></th>
+                <td>
+                    <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=clear_transients'), 'wpd_clear_transients_nonce'); ?>" class="button"><?php _e('پاک کردن کش', 'wp-directory'); ?></a>
+                    <p class="description"><?php _e('این ابزار تمام داده‌های موقت (transients) که توسط افزونه نیلای دایرکتوری ایجاد شده را حذف می‌کند.', 'wp-directory'); ?></p>
+                </td>
+            </tr>
+            <tr>
+                <th><?php _e('اجرای مجدد رویدادهای روزانه', 'wp-directory'); ?></th>
+                <td>
+                    <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=wpd-tools&wpd_tool_action=run_daily_events'), 'wpd_run_daily_events_nonce'); ?>" class="button"><?php _e('اجرای رویدادها', 'wp-directory'); ?></a>
+                    <p class="description"><?php _e('این ابزار به صورت دستی رویدادهای زمان‌بندی شده روزانه (مانند منقضی کردن آگهی‌ها) را اجرا می‌کند.', 'wp-directory'); ?></p>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+    
+    public function handle_tools_actions() {
+        if (isset($_GET['wpd_tool_action']) && current_user_can('manage_options')) {
+            $action = sanitize_key($_GET['wpd_tool_action']);
+            if ($action === 'clear_transients' && check_admin_referer('wpd_clear_transients_nonce')) {
+                Directory_Main::clear_transients();
+                add_action('admin_notices', function() {
+                    echo '<div class="notice notice-success is-dismissible"><p>' . __('کش افزونه با موفقیت پاک شد.', 'wp-directory') . '</p></div>';
+                });
+            }
+            if ($action === 'run_daily_events' && check_admin_referer('wpd_run_daily_events_nonce')) {
+                do_action('wpd_daily_scheduled_events');
+                add_action('admin_notices', function() {
+                    echo '<div class="notice notice-success is-dismissible"><p>' . __('رویدادهای روزانه با موفقیت اجرا شدند.', 'wp-directory') . '</p></div>';
+                });
+            }
+        }
+    }
+
+    private function render_add_transaction_page() {
+        ?>
+        <div class="wrap">
+            <h1><?php _e('افزودن تراکنش دستی', 'wp-directory'); ?></h1>
+            <form method="post">
+                <?php wp_nonce_field('wpd_add_manual_transaction'); ?>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="user_id"><?php _e('کاربر', 'wp-directory'); ?></label></th>
+                        <td>
+                            <?php
+                            wp_dropdown_users([
+                                'name' => 'user_id',
+                                'id' => 'user_id',
+                                'show_option_none' => __('انتخاب کاربر', 'wp-directory'),
+                                'class' => 'regular-text'
+                            ]);
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="amount"><?php _e('مبلغ', 'wp-directory'); ?></label></th>
+                        <td><input type="number" id="amount" name="amount" class="regular-text" required></td>
+                    </tr>
+                    <tr>
+                        <th><label for="status"><?php _e('وضعیت', 'wp-directory'); ?></label></th>
+                        <td>
+                            <select name="status" id="status">
+                                <option value="completed"><?php _e('موفق', 'wp-directory'); ?></option>
+                                <option value="pending"><?php _e('در انتظار', 'wp-directory'); ?></option>
+                                <option value="failed"><?php _e('ناموفق', 'wp-directory'); ?></option>
+                            </select>
+                        </td>
+                    </tr>
+                     <tr>
+                        <th><label for="transaction_id"><?php _e('کد رهگیری (اختیاری)', 'wp-directory'); ?></label></th>
+                        <td><input type="text" id="transaction_id" name="transaction_id" class="regular-text"></td>
+                    </tr>
+                </table>
+                <input type="hidden" name="wpd_action" value="add_manual_transaction">
+                <?php submit_button(__('افزودن تراکنش', 'wp-directory')); ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    public function handle_manual_transaction_submission() {
+        if (isset($_POST['wpd_action']) && $_POST['wpd_action'] === 'add_manual_transaction') {
+            if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'wpd_add_manual_transaction')) {
+                return;
+            }
+            if (!current_user_can('manage_options')) {
+                return;
+            }
+
+            $user_id = intval($_POST['user_id']);
+            $amount = floatval($_POST['amount']);
+            $status = sanitize_key($_POST['status']);
+            $transaction_id = sanitize_text_field($_POST['transaction_id']);
+
+            if (empty($user_id) || empty($amount)) {
+                add_action('admin_notices', function() {
+                    echo '<div class="notice notice-error"><p>' . __('لطفا کاربر و مبلغ را مشخص کنید.', 'wp-directory') . '</p></div>';
+                });
+                return;
+            }
+
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'wpd_transactions';
+            $wpdb->insert($table_name, [
+                'user_id' => $user_id,
+                'amount' => $amount,
+                'status' => $status,
+                'gateway' => 'manual',
+                'transaction_id' => $transaction_id,
+                'created_at' => current_time('mysql'),
+            ]);
+
+            wp_redirect(admin_url('admin.php?page=wpd-transactions'));
+            exit;
         }
     }
 }

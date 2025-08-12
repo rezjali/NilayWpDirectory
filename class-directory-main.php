@@ -125,7 +125,6 @@ if ( ! class_exists( 'Directory_Main' ) ) {
         }
 
         /**
-         * START OF CHANGE: New logging function.
          * تابع مرکزی برای ثبت لاگ در فایل debug.log وردپرس
          *
          * @param string|array|object $message پیامی که باید لاگ شود
@@ -139,13 +138,6 @@ if ( ! class_exists( 'Directory_Main' ) ) {
                 }
             }
         }
-        // END OF CHANGE
-
-        /**
-         * START OF CHANGE: Removed is_shamsi_calendar_enabled() function.
-         * The plugin now exclusively uses the Shamsi calendar.
-         */
-        // END OF CHANGE
 
         /**
          * لیست کامل اصطلاحات پیش‌فرض افزونه
@@ -396,5 +388,52 @@ if ( ! class_exists( 'Directory_Main' ) ) {
                 }
             }
         }
+
+        // START OF NEW FEATURES: Functions for Tools and System Status
+
+        /**
+         * Gathers system status information.
+         * @return array
+         */
+        public static function get_system_status_info() {
+            global $wpdb;
+            
+            $status = [];
+
+            // WordPress Environment
+            $status['wp'] = [
+                'آدرس سایت' => home_url(),
+                'نسخه وردپرس' => get_bloginfo('version'),
+                'حالت چندسایتی' => is_multisite() ? 'بله' : 'خیر',
+                'حد حافظه وردپرس' => size_format(wp_convert_hr_to_bytes(WP_MEMORY_LIMIT)),
+                'حالت دیباگ' => defined('WP_DEBUG') && WP_DEBUG ? 'فعال' : 'غیرفعال',
+                'زبان سایت' => get_locale(),
+            ];
+
+            // Server Environment
+            $status['server'] = [
+                'نرم‌افزار سرور' => $_SERVER['SERVER_SOFTWARE'] ?? 'N/A',
+                'نسخه PHP' => phpversion(),
+                'حد حافظه PHP' => ini_get('memory_limit'),
+                'زمان حداکثر اجرای PHP' => ini_get('max_execution_time'),
+                'حداکثر حجم آپلود' => size_format(wp_max_upload_size()),
+                'نسخه MySQL' => $wpdb->db_version(),
+            ];
+
+            return $status;
+        }
+
+        /**
+         * Clears all transients created by this plugin.
+         */
+        public static function clear_transients() {
+            global $wpdb;
+            $prefix = '_transient_wpd_';
+            $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $wpdb->esc_like($prefix) . '%'
+            ));
+        }
+        // END OF NEW FEATURES
     }
 }

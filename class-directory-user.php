@@ -26,9 +26,14 @@ if ( ! class_exists( 'Directory_User' ) ) {
             add_action( 'personal_options_update', [ $this, 'save_custom_user_profile_fields' ] );
             add_action( 'edit_user_profile_update', [ $this, 'save_custom_user_profile_fields' ] );
 
-            // START OF CHANGE: هوک برای ارسال اعلان ثبت‌نام کاربر جدید
             add_action( 'user_register', [ $this, 'trigger_new_user_notification' ], 10, 1 );
-            // END OF CHANGE
+
+            // START OF NEW FEATURES: Hooks for user list columns
+            add_filter( 'manage_users_columns', [ $this, 'add_user_list_columns' ] );
+            add_filter( 'manage_users_custom_column', [ $this, 'render_user_list_columns' ], 10, 3 );
+            add_filter( 'manage_users_sortable_columns', [ $this, 'make_user_list_columns_sortable' ] );
+            add_action( 'pre_get_users', [ $this, 'sort_users_by_listing_count' ] );
+            // END OF NEW FEATURES
         }
 
         /**
@@ -191,5 +196,84 @@ if ( ! class_exists( 'Directory_User' ) ) {
         public function trigger_new_user_notification( $user_id ) {
             Directory_Main::trigger_notification('new_user', ['user_id' => $user_id]);
         }
+
+        // START OF NEW FEATURES: Functions for user list columns
+
+        /**
+         * Adds custom columns to the user list table.
+         * @param array $columns Existing columns.
+         * @return array Modified columns.
+         */
+        public function add_user_list_columns( $columns ) {
+            $columns['wpd_listing_count'] = __( 'تعداد آگهی', 'wp-directory' );
+            $columns['wpd_current_package'] = __( 'بسته فعلی', 'wp-directory' );
+            $columns['wpd_package_expiry'] = __( 'تاریخ انقضا بسته', 'wp-directory' );
+            return $columns;
+        }
+
+        /**
+         * Renders the content for the custom user list columns.
+         * @param mixed $value The value to display.
+         * @param string $column_name The name of the column.
+         * @param int $user_id The ID of the user.
+         * @return mixed The content to display.
+         */
+        public function render_user_list_columns( $value, $column_name, $user_id ) {
+            switch ( $column_name ) {
+                case 'wpd_listing_count':
+                    return count_user_posts( $user_id, 'wpd_listing' );
+                
+                case 'wpd_current_package':
+                    $package_id = get_user_meta( $user_id, '_wpd_user_package_id', true );
+                    if ( $package_id ) {
+                        return '<a href="' . get_edit_post_link($package_id) . '">' . get_the_title( $package_id ) . '</a>';
+                    }
+                    return '---';
+
+                case 'wpd_package_expiry':
+                    $expiry_date = get_user_meta( $user_id, '_wpd_user_package_expires', true );
+                    if ( $expiry_date ) {
+                        return date_i18n( 'Y/m/d', strtotime( $expiry_date ) );
+                    }
+                    return __( 'نامحدود', 'wp-directory' );
+            }
+            return $value;
+        }
+
+        /**
+         * Makes the custom user list columns sortable.
+         * @param array $columns Existing sortable columns.
+         * @return array Modified sortable columns.
+         */
+        public function make_user_list_columns_sortable( $columns ) {
+            $columns['wpd_listing_count'] = 'listing_count';
+            return $columns;
+        }
+
+        /**
+         * Handles the sorting logic for the custom user list columns.
+         * @param WP_User_Query $query The user query object.
+         */
+        public function sort_users_by_listing_count( $query ) {
+            if ( ! is_admin() ) {
+                return;
+            }
+
+            $orderby = $query->get( 'orderby' );
+
+            if ( 'listing_count' === $orderby ) {
+                $query->set( 'meta_key', 'wpd_listing_count_for_sort' ); // A temporary meta key
+                $query->set( 'orderby', 'meta_value_num' );
+
+                // We need to calculate and store the count for sorting
+                global $wpdb;
+                $user_ids = $wpdb->get_col("SELECT ID FROM {$wpdb->users}");
+                foreach ($user_ids as $user_id) {
+                    $count = count_user_posts($user_id, 'wpd_listing');
+                    update_user_meta($user_id, 'wpd_listing_count_for_sort', $count);
+                }
+            }
+        }
+        // END OF NEW FEATURES
     }
 }
