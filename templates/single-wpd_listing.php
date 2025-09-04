@@ -128,6 +128,37 @@ if ($post && $post->post_type === 'wpd_listing') :
                     endif;
                     break;
                 
+                case 'image_checkbox':
+                    $saved_values = is_array($meta_value) ? $meta_value : [];
+                    $image_options = $field['image_options'] ?? [];
+                    $columns = $field['display_columns'] ?? 3;
+
+                    if (!empty($saved_values) && !empty($image_options)) {
+                        $selected_options = array_filter($image_options, function($option) use ($saved_values) {
+                            return in_array($option['value'], $saved_values);
+                        });
+
+                        if (!empty($selected_options)) {
+                            echo '<h4>' . esc_html($field['label']) . '</h4>';
+                            echo '<div class="wpd-image-checkbox-display-wrapper" style="--wpd-grid-columns: ' . esc_attr($columns) . ';">';
+                            
+                            foreach ($selected_options as $option) {
+                                $image_url = wp_get_attachment_image_url($option['image_id'], 'thumbnail');
+                                if (!$image_url) {
+                                    $placeholder_text = urlencode($option['title']);
+                                    $image_url = "https://placehold.co/150x150/EFEFEF/AAAAAA?text={$placeholder_text}";
+                                }
+                                echo '<div class="wpd-image-checkbox-display-item">';
+                                echo '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($option['title']) . '">';
+                                echo '<span>' . esc_html($option['title']) . '</span>';
+                                echo '</div>';
+                            }
+                            
+                            echo '</div>';
+                        }
+                    }
+                    break;
+
                 case 'repeater':
                     if (!empty($meta_value) && is_array($meta_value)) :
                         $sub_field_defs = $field['sub_fields'] ?? [];

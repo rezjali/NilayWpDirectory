@@ -14,7 +14,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             add_action( 'init', [ $this, 'register_dynamic_taxonomies' ], 10 );
             add_action( 'add_meta_boxes', [ $this, 'add_meta_boxes' ] );
             
-            // Re-add the original function to remove default WordPress metaboxes
             add_action( 'admin_menu', [ $this, 'remove_default_meta_boxes' ] );
 
             add_action( 'save_post_wpd_listing', [ $this, 'save_listing_meta_data' ] );
@@ -70,7 +69,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 'has_archive'        => true,
                 'hierarchical'       => false,
                 'menu_position'      => 5,
-                // Reverted to original 'supports' to hide default metaboxes
                 'supports'           => [ 'title', 'author' ], 
                 'menu_icon'          => 'dashicons-list-view',
             ];
@@ -90,7 +88,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 'show_ui'       => true,
                 'show_in_menu'  => 'wpd-main-menu',
                 'capability_type' => 'post',
-                'supports'      => [ 'title' ],
+                'supports'      => [ 'title', 'editor', 'slug' ], // *** FIX: Added 'slug' and 'editor' support
             ];
             register_post_type( 'wpd_listing_type', $type_args );
 
@@ -191,7 +189,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             remove_meta_box( 'postimagediv', 'wpd_listing', 'side' );
             remove_meta_box( 'commentstatusdiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'commentsdiv', 'wpd_listing', 'normal' );
-            remove_meta_box( 'slugdiv', 'wpd_listing', 'normal' );
+            // Keep slugdiv for wpd_listing_type
+            if (get_current_screen()->post_type === 'wpd_listing') {
+                remove_meta_box( 'slugdiv', 'wpd_listing', 'normal' );
+            }
             remove_meta_box( 'authordiv', 'wpd_listing', 'normal' );
             remove_meta_box( 'postexcerpt', 'wpd_listing', 'normal' );
         }
@@ -325,6 +326,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 'use_as_featured_image' => 0,
                 'max_files' => 1
             ]);
+             // *** NEW: Settings for image_checkbox field
+            $image_options = $field_data['image_options'] ?? [];
+            $display_columns = $field_data['display_columns'] ?? 3;
             ?>
             <div class="wpd-field-row" data-index="<?php echo esc_attr($index); ?>" data-field-key="<?php echo esc_attr($key); ?>">
                 <div class="wpd-field-header">
@@ -358,6 +362,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 <option value="select" <?php selected( $type, 'select' ); ?>><?php _e( 'لیست کشویی', 'wp-directory' ); ?></option>
                                 <option value="multiselect" <?php selected( $type, 'multiselect' ); ?>><?php _e( 'چند انتخابی', 'wp-directory' ); ?></option>
                                 <option value="checkbox" <?php selected( $type, 'checkbox' ); ?>><?php _e( 'چک‌باکس', 'wp-directory' ); ?></option>
+                                <option value="image_checkbox" <?php selected( $type, 'image_checkbox' ); ?>><?php _e( 'چک‌باکس تصویری', 'wp-directory' ); ?></option> <!-- *** NEW: Added image_checkbox field type -->
                                 <option value="radio" <?php selected( $type, 'radio' ); ?>><?php _e( 'دکمه رادیویی', 'wp-directory' ); ?></option>
                             </optgroup>
                             <optgroup label="<?php _e('فیلدهای ساختاری', 'wp-directory'); ?>">
@@ -383,6 +388,38 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         </select>
                         <textarea name="wpd_fields[<?php echo esc_attr($index); ?>][options]" class="wpd-field-options" placeholder="<?php _e( 'گزینه‌ها (جدا شده با کاما) یا محتوای HTML', 'wp-directory' ); ?>" style="<?php echo in_array($type, ['select', 'multiselect', 'checkbox', 'radio', 'html_content']) ? '' : 'display:none;'; ?>"><?php echo esc_textarea($options); ?></textarea>
                     </div>
+
+                     <!-- *** NEW: Settings panel for image_checkbox -->
+                    <div class="wpd-field-settings-panel wpd-image-checkbox-settings" style="<?php echo ($type === 'image_checkbox') ? '' : 'display:none;'; ?>">
+                        <h4><?php _e('تنظیمات چک‌باکس تصویری', 'wp-directory'); ?></h4>
+                        <div class="wpd-image-options-container">
+                            <?php if (!empty($image_options)) : foreach($image_options as $opt_index => $option) : ?>
+                            <div class="wpd-image-option-row">
+                                <span class="dashicons dashicons-move handle"></span>
+                                <input type="text" name="wpd_fields[<?php echo esc_attr($index); ?>][image_options][<?php echo esc_attr($opt_index); ?>][title]" value="<?php echo esc_attr($option['title'] ?? ''); ?>" placeholder="<?php _e('عنوان', 'wp-directory'); ?>">
+                                <input type="text" name="wpd_fields[<?php echo esc_attr($index); ?>][image_options][<?php echo esc_attr($opt_index); ?>][value]" value="<?php echo esc_attr($option['value'] ?? ''); ?>" placeholder="<?php _e('مقدار', 'wp-directory'); ?>">
+                                <div class="wpd-image-preview-wrapper">
+                                    <?php $img_src = !empty($option['image_id']) ? wp_get_attachment_image_url($option['image_id'], 'thumbnail') : ''; ?>
+                                    <img src="<?php echo esc_url($img_src); ?>" class="wpd-image-option-preview" style="<?php echo empty($img_src) ? 'display:none;' : ''; ?>">
+                                </div>
+                                <input type="hidden" name="wpd_fields[<?php echo esc_attr($index); ?>][image_options][<?php echo esc_attr($opt_index); ?>][image_id]" value="<?php echo esc_attr($option['image_id'] ?? ''); ?>" class="wpd-image-option-id">
+                                <button type="button" class="button wpd-upload-image-option-btn"><?php _e('انتخاب تصویر', 'wp-directory'); ?></button>
+                                <a href="#" class="wpd-remove-image-option"><span class="dashicons dashicons-trash"></span></a>
+                            </div>
+                            <?php endforeach; endif; ?>
+                        </div>
+                        <button type="button" class="button wpd-add-image-option-btn"><?php _e('افزودن گزینه', 'wp-directory'); ?></button>
+                        <hr>
+                        <label>
+                            <?php _e('تعداد ستون‌ها برای نمایش:', 'wp-directory'); ?>
+                            <select name="wpd_fields[<?php echo esc_attr($index); ?>][display_columns]">
+                                <?php for ($i=1; $i <= 6; $i++) {
+                                    echo '<option value="' . $i . '" ' . selected($display_columns, $i, false) . '>' . $i . '</option>';
+                                } ?>
+                            </select>
+                        </label>
+                    </div>
+
                     
                     <div class="wpd-field-settings-panel">
                         <h4><?php _e('تنظیمات پایه', 'wp-directory'); ?></h4>
@@ -741,6 +778,23 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     'default_value' => isset($field['default_value']) ? sanitize_text_field($field['default_value']) : '',
                 ];
 
+                // *** NEW: Sanitize settings for image_checkbox field
+                if ($sanitized_field['type'] === 'image_checkbox') {
+                    $sanitized_field['display_columns'] = isset($field['display_columns']) ? absint($field['display_columns']) : 3;
+                    $sanitized_field['image_options'] = [];
+                    if (isset($field['image_options']) && is_array($field['image_options'])) {
+                        foreach($field['image_options'] as $option) {
+                            if (!empty($option['title']) && !empty($option['value'])) {
+                                $sanitized_field['image_options'][] = [
+                                    'title' => sanitize_text_field($option['title']),
+                                    'value' => sanitize_text_field($option['value']),
+                                    'image_id' => absint($option['image_id']),
+                                ];
+                            }
+                        }
+                    }
+                }
+
                 if (isset($field['conditional_logic']['enabled'])) {
                     $sanitized_field['conditional_logic'] = [
                         'enabled'      => 1,
@@ -825,7 +879,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 $posted_value = $value_exists ? $posted_data[$field_def['key']] : null;
 
                 if (!$value_exists) {
-                    if (in_array($field_def['type'], ['checkbox', 'multiselect', 'repeater', 'social_networks', 'simple_list', 'gallery', 'image', 'file', 'product'])) {
+                    if (in_array($field_def['type'], ['checkbox', 'image_checkbox', 'multiselect', 'repeater', 'social_networks', 'simple_list', 'gallery', 'image', 'file', 'product'])) {
                         delete_post_meta($post_id, $meta_key);
                     }
                     continue;
@@ -903,6 +957,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 case 'textarea':
                     return sanitize_textarea_field($value);
                 case 'checkbox':
+                case 'image_checkbox': // *** NEW: Added image_checkbox to sanitize as an array
                 case 'multiselect':
                     return is_array($value) ? array_map('sanitize_text_field', $value) : sanitize_text_field($value);
                 case 'gallery':
@@ -959,7 +1014,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                 wp_enqueue_style('leaflet-css', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css', [], '1.7.1');
                 wp_enqueue_script('leaflet-js', 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js', [], '1.7.1', true);
 
-                // BUG FIX: Pass all dynamic taxonomy slugs to javascript for hiding/showing
                 $all_dynamic_tax_slugs = [];
                 $listing_types = get_posts(['post_type' => 'wpd_listing_type', 'numberposts' => -1, 'post_status' => 'publish']);
                 if(!empty($listing_types)) {
@@ -1012,6 +1066,9 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                     .wpd-conditional-rules { padding-top: 10px; margin-top: 10px; border-top: 1px dashed #ccc; }
                     .wpd-conditional-rules select, .wpd-conditional-rules input { vertical-align: middle; }
                     .wpd-compound-sub-field-setting { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+                    .wpd-image-option-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; padding: 5px; background: #fff; }
+                    .wpd-image-option-preview { max-width: 40px; max-height: 40px; border: 1px solid #ddd; }
+                    .wpd-remove-image-option { color: #a00; text-decoration: none; }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
@@ -1024,6 +1081,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             $details.find('.wpd-address-settings').toggle(fieldType === 'address');
                             $details.find('.wpd-identity-settings').toggle(fieldType === 'identity');
                             $details.find('.wpd-product-settings').toggle(fieldType === 'product');
+                             $details.find('.wpd-image-checkbox-settings').toggle(fieldType === 'image_checkbox'); // *** NEW
                             
                             var $fileSettings = $details.find('.wpd-file-settings');
                             $fileSettings.toggle(['image', 'file', 'gallery'].includes(fieldType));
@@ -1034,7 +1092,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         }
                         
                         function initSortable() {
-                            $('.wpd-sortable-list').sortable({
+                            $('.wpd-sortable-list, .wpd-image-options-container').sortable({
                                 handle: '.handle',
                                 opacity: 0.7,
                                 placeholder: 'wpd-sortable-placeholder',
@@ -1045,9 +1103,12 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         }
                         initSortable();
 
-                        function updateConditionalFieldDropdowns() {
+                        // *** FIX: Reworked conditional logic to be context-aware
+                        function updateConditionalFieldDropdowns($context) {
                             var fields = [];
-                            $('#wpd-fields-container > .wpd-field-row').each(function(){
+                            var $fieldRows = $context.is('.wpd-field-row') ? $context.parent().children('.wpd-field-row') : $context.children('.wpd-field-row');
+
+                            $fieldRows.each(function(){
                                 var key = $(this).find('.field-key-input').first().val();
                                 var label = $(this).find('.field-label-input').first().val();
                                 if (key && label) {
@@ -1055,7 +1116,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 }
                             });
 
-                            $('.wpd-conditional-target-field').each(function(){
+                            $context.find('.wpd-conditional-target-field').each(function(){
                                 var $select = $(this);
                                 var currentTarget = $select.val();
                                 var parentFieldKey = $select.closest('.wpd-field-row').data('field-key');
@@ -1070,11 +1131,17 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                                 });
                             });
                         }
+                        
+                        // Initial population of all dropdowns
+                        updateConditionalFieldDropdowns($('#wpd-fields-container'));
+                        $('.wpd-repeater-sub-fields').each(function(){
+                            updateConditionalFieldDropdowns($(this));
+                        });
 
-                        function getNewIndex() {
-                            var container = $('#wpd-fields-container');
+
+                        function getNewIndex(containerSelector) {
                             var maxIndex = -1;
-                            container.children().each(function() {
+                            $(containerSelector).children().each(function() {
                                 var index = parseInt($(this).data('index'));
                                 if (!isNaN(index) && index > maxIndex) {
                                     maxIndex = index;
@@ -1082,7 +1149,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             });
                             return maxIndex + 1;
                         }
-
 
                         $('#wpd-field-builder-wrapper').on('change', '.wpd-field-type-selector', function() {
                             toggleOptionsField(this);
@@ -1092,42 +1158,40 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             e.preventDefault();
                             $(this).closest('.wpd-field-row').find('.wpd-field-details').slideToggle('fast');
                         });
-                        $('#wpd-field-builder-wrapper').on('keyup', '.field-label-input', function() {
-                            var newTitle = $(this).val() || 'فیلد جدید';
-                            $(this).closest('.wpd-field-row').find('.wpd-field-header strong').text(newTitle);
-                            updateConditionalFieldDropdowns();
-                        });
-                        $('#wpd-field-builder-wrapper').on('keyup', '.field-key-input', function() {
-                            var newKey = $(this).val().replace(/[^a-z0-9_]/gi, '').toLowerCase();
-                            $(this).val(newKey);
-                            $(this).closest('.wpd-field-row').data('field-key', newKey);
-                            updateConditionalFieldDropdowns();
+
+                        // *** FIX: Trigger conditional logic update on key/label change
+                        $('#wpd-field-builder-wrapper').on('keyup', '.field-label-input, .field-key-input', function() {
+                            var $context = $(this).closest('.wpd-repeater-sub-fields, #wpd-fields-container');
+                            if ($(this).hasClass('field-label-input')) {
+                                var newTitle = $(this).val() || 'فیلد جدید';
+                                $(this).closest('.wpd-field-row').find('.wpd-field-header strong').text(newTitle);
+                            } else {
+                                var newKey = $(this).val().replace(/[^a-z0-9_]/gi, '').toLowerCase();
+                                $(this).val(newKey);
+                                $(this).closest('.wpd-field-row').data('field-key', newKey);
+                            }
+                            updateConditionalFieldDropdowns($context);
                         });
 
-                        $('#wpd-field-builder-wrapper').on('click', '.wpd-remove-field', function(e) {
-                            e.preventDefault();
-                            if (confirm('آیا از حذف این فیلد مطمئن هستید؟')) {
-                                $(this).closest('.wpd-field-row').remove();
-                                updateConditionalFieldDropdowns();
-                            }
-                        });
-                        $('#wpd-field-builder-wrapper').on('click', '.wpd-quick-remove-field', function(e) {
+
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-remove-field, .wpd-quick-remove-field', function(e) {
                             e.preventDefault();
                              if (confirm('<?php _e('آیا از حذف این فیلد مطمئن هستید؟', 'wp-directory'); ?>')) {
+                                var $context = $(this).closest('.wpd-repeater-sub-fields, #wpd-fields-container');
                                 $(this).closest('.wpd-field-row').remove();
-                                updateConditionalFieldDropdowns();
+                                updateConditionalFieldDropdowns($context);
                             }
                         });
 
 
                         $('#wpd-add-field').on('click', function(e) {
                             e.preventDefault();
-                            var newIndex = getNewIndex();
-                            var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__', [], $fields)); ?>.replace(/__INDEX__/g, newIndex));
+                            var newIndex = getNewIndex('#wpd-fields-container');
+                            var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__', [], [])); ?>.replace(/__INDEX__/g, newIndex));
                             field_html.find('.wpd-field-details').show();
                             $('#wpd-fields-container').append(field_html);
-                            field_html.find('.wpd-file-settings').hide();
-                            updateConditionalFieldDropdowns();
+                            field_html.find('.wpd-file-settings, .wpd-image-checkbox-settings').hide();
+                            updateConditionalFieldDropdowns($('#wpd-fields-container'));
                         });
                         
                         $('#wpd-add-taxonomy').on('click', function(e) {
@@ -1161,8 +1225,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         $('#wpd-field-builder-wrapper').on('click', '.wpd-copy-field', function(e) {
                             e.preventDefault();
                             var $originalRow = $(this).closest('.wpd-field-row');
+                            var $context = $originalRow.parent();
+                            var newIndex = getNewIndex('#' + $context.attr('id'));
+                            
                             var $clonedRow = $originalRow.clone();
-                            var newIndex = getNewIndex();
                             
                             $clonedRow.attr('data-index', newIndex);
                             $clonedRow.find('[name]').each(function() {
@@ -1179,7 +1245,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             $clonedRow.find('.wpd-field-header strong').text(oldLabel + ' (کپی)');
 
                             $clonedRow.insertAfter($originalRow);
-                            updateConditionalFieldDropdowns();
+                            updateConditionalFieldDropdowns($context);
                         });
 
                         $('#wpd-field-builder-wrapper').on('click', '.wpd-add-sub-field', function(e) {
@@ -1191,6 +1257,7 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             var field_html = $(<?php echo json_encode($this->get_field_builder_row_html('__INDEX__')); ?>.replace(/__INDEX__/g, namePrefix));
                             field_html.find('.wpd-field-details').show();
                             subContainer.append(field_html);
+                            updateConditionalFieldDropdowns(subContainer);
                         });
 
                         $('#wpd-field-builder-wrapper').on('change', '.wpd-conditional-enable', function() {
@@ -1212,6 +1279,53 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             $(this).closest('.wpd-product-settings').find('.wpd-product-fixed-price-wrapper').toggle(mode === 'fixed');
                         });
                         
+                        // *** NEW: JS for image_checkbox options
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-add-image-option-btn', function(e) {
+                            e.preventDefault();
+                            var $container = $(this).siblings('.wpd-image-options-container');
+                            var fieldIndex = $(this).closest('.wpd-field-row').data('index');
+                            var newOptIndex = $container.children().length;
+                            var namePrefix = 'wpd_fields[' + fieldIndex + '][image_options][' + newOptIndex + ']';
+                            var newRow = `
+                                <div class="wpd-image-option-row">
+                                    <span class="dashicons dashicons-move handle"></span>
+                                    <input type="text" name="${namePrefix}[title]" value="" placeholder="<?php _e('عنوان', 'wp-directory'); ?>">
+                                    <input type="text" name="${namePrefix}[value]" value="" placeholder="<?php _e('مقدار', 'wp-directory'); ?>">
+                                    <div class="wpd-image-preview-wrapper"><img src="" class="wpd-image-option-preview" style="display:none;"></div>
+                                    <input type="hidden" name="${namePrefix}[image_id]" class="wpd-image-option-id" value="">
+                                    <button type="button" class="button wpd-upload-image-option-btn"><?php _e('انتخاب تصویر', 'wp-directory'); ?></button>
+                                    <a href="#" class="wpd-remove-image-option"><span class="dashicons dashicons-trash"></span></a>
+                                </div>`;
+                            $container.append(newRow);
+                        });
+
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-remove-image-option', function(e) {
+                            e.preventDefault();
+                            $(this).closest('.wpd-image-option-row').remove();
+                        });
+
+                        $('#wpd-field-builder-wrapper').on('click', '.wpd-upload-image-option-btn', function(e) {
+                            e.preventDefault();
+                            var $button = $(this);
+                            var $row = $button.closest('.wpd-image-option-row');
+                            var $preview = $row.find('.wpd-image-option-preview');
+                            var $idInput = $row.find('.wpd-image-option-id');
+                            
+                            var frame = wp.media({
+                                title: '<?php _e("انتخاب تصویر گزینه", "wp-directory"); ?>',
+                                multiple: false,
+                                library: { type: 'image' }
+                            });
+
+                            frame.on('select', function() {
+                                var attachment = frame.state().get('selection').first().toJSON();
+                                $idInput.val(attachment.id);
+                                $preview.attr('src', attachment.sizes.thumbnail.url).show();
+                            });
+                            
+                            frame.open();
+                        });
+
                         $('form#post').on('submit', function(e){
                             var keys = {};
                             var duplicateFound = false;
@@ -1234,7 +1348,6 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             }
                         });
                         
-                        updateConditionalFieldDropdowns();
                     });
                 </script>
                 <?php
@@ -1243,55 +1356,24 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
             if ( ( $pagenow == 'post-new.php' || $pagenow == 'post.php' ) && $post_type == 'wpd_listing' ) {
                 ?>
                 <style>
-                    .wpd-fields-container {
-                        display: flex;
-                        flex-wrap: wrap;
-                        margin: 0 -10px;
-                    }
-                    .wpd-admin-field-wrapper {
-                        padding: 0 10px;
-                        margin-bottom: 20px;
-                        box-sizing: border-box;
-                    }
+                    .wpd-fields-container { display: flex; flex-wrap: wrap; margin: 0 -10px; }
+                    .wpd-admin-field-wrapper { padding: 0 10px; margin-bottom: 20px; box-sizing: border-box; }
                     .wpd-admin-field-col-full { width: 100%; }
                     .wpd-admin-field-col-half { width: 50%; }
                     .wpd-admin-field-col-third { width: 33.33%; }
                     .wpd-admin-field-col-quarter { width: 25%; }
-                    @media (max-width: 782px) {
-                        .wpd-admin-field-col-half,
-                        .wpd-admin-field-col-third,
-                        .wpd-admin-field-col-quarter {
-                            width: 100%;
-                        }
-                    }
+                    @media (max-width: 782px) { .wpd-admin-field-col-half, .wpd-admin-field-col-third, .wpd-admin-field-col-quarter { width: 100%; } }
                     .wpd-admin-field-wrapper label { font-weight: bold; display: block; margin-bottom: 5px; }
-                    .wpd-admin-field-wrapper input[type="text"],
-                    .wpd-admin-field-wrapper input[type="url"],
-                    .wpd-admin-field-wrapper input[type="email"],
-                    .wpd-admin-field-wrapper input[type="number"],
-                    .wpd-admin-field-wrapper input[type="time"],
-                    .wpd-admin-field-wrapper select,
-                    .wpd-admin-field-wrapper textarea {
-                        width: 100%;
-                    }
+                    .wpd-admin-field-wrapper input[type="text"], .wpd-admin-field-wrapper input[type="url"], .wpd-admin-field-wrapper input[type="email"], .wpd-admin-field-wrapper input[type="number"], .wpd-admin-field-wrapper input[type="time"], .wpd-admin-field-wrapper select, .wpd-admin-field-wrapper textarea { width: 100%; }
                     .wpd-gallery-field-wrapper .gallery-preview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
                     .wpd-gallery-field-wrapper .gallery-preview .image-container { position: relative; }
                     .wpd-gallery-field-wrapper .gallery-preview img { width: 100px; height: 100px; object-fit: cover; border: 1px solid #ddd; }
                     .wpd-gallery-field-wrapper .gallery-preview .remove-image { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; text-align: center; line-height: 20px; }
                     .wpd-repeater-row, .wpd-compound-field-row { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; background: #fdfdfd; }
                     .wpd-repeater-row-actions { margin-top: 10px; text-align: left; }
-                    .ui-datepicker {
-                        direction: rtl;
-                    }
-                    .ui-datepicker-header {
-                        direction: ltr;
-                    }
-                    .wpd-map-field-wrapper .map-preview {
-                        width: 100%;
-                        height: 250px;
-                        background: #eee;
-                        margin-top: 10px;
-                    }
+                    .ui-datepicker { direction: rtl; }
+                    .ui-datepicker-header { direction: ltr; }
+                    .wpd-map-field-wrapper .map-preview { width: 100%; height: 250px; background: #eee; margin-top: 10px; }
                 </style>
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
@@ -1299,24 +1381,16 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                         const ajaxNonce = wpd_admin_params.ajax_nonce;
                         const all_dynamic_taxonomies = wpd_admin_params.all_dynamic_taxonomies;
                         
-                        /**
-                         * BUG FIX: This is the new robust function to handle taxonomy visibility.
-                         * It hides all dynamic taxonomies first, then shows only the relevant ones.
-                         * This fixes both the initial display bug and the hierarchical display issue.
-                         */
                         function updateTaxonomyMetaboxes(visible_tax_slugs) {
-                            // 1. Hide all possible dynamic taxonomies, targeting both hierarchical and non-hierarchical metabox IDs
                             if (Array.isArray(all_dynamic_taxonomies)) {
                                 all_dynamic_taxonomies.forEach(function(slug) {
-                                    $('#' + slug + 'div').hide(); // Hide hierarchical box
-                                    $('#tagsdiv-' + slug).hide(); // Hide non-hierarchical (tag) box
+                                    $('#' + slug + 'div').hide(); 
+                                    $('#tagsdiv-' + slug).hide(); 
                                 });
                             }
 
-                            // 2. Show only the taxonomies that should be visible for the selected type
                             if (Array.isArray(visible_tax_slugs)) {
                                 visible_tax_slugs.forEach(function(slug) {
-                                    // Try to show both possible metabox formats. Only the one that exists will be shown.
                                     $('#' + slug + 'div').show();
                                     $('#tagsdiv-' + slug).show();
                                 });
@@ -1497,14 +1571,10 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
                             });
                         });
                         
-                        // On initial page load, hide all dynamic taxonomies.
-                        // The correct ones will be shown by PHP on existing posts, or by JS after selecting a type on new posts.
                         if ($('#wpd_listing_type_selector').val() === '') {
                              updateTaxonomyMetaboxes([]);
                         }
                         
-                        // If a type is already selected on page load (editing an existing post),
-                        // the PHP logic has already handled the taxonomies. We just initialize JS components.
                         if ($('#wpd_listing_type_selector').val()) {
                             initializeWpdComponents($('#wpd-admin-custom-fields-wrapper'));
                             initializeAdminConditionalLogic($('#wpd-admin-custom-fields-wrapper'));
@@ -2004,3 +2074,4 @@ if ( ! class_exists( 'Directory_Post_Types' ) ) {
         }
     }
 }
+

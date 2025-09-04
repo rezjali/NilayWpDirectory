@@ -923,6 +923,33 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
                                 echo '<label><input type="checkbox" name="' . esc_attr($field_name) . '[]" value="' . esc_attr($option) . '" ' . (in_array($option, $saved_values) ? 'checked' : '') . '> ' . esc_html($option) . '</label>';
                             }
                             break;
+                        // *** FIX: Added rendering logic for image_checkbox field
+                        case 'image_checkbox':
+                            $image_options = $field['image_options'] ?? [];
+                            $columns = $field['display_columns'] ?? 3;
+                            $saved_values = is_array($value) ? $value : [];
+                            if (!empty($image_options)) {
+                                echo '<div class="wpd-image-checkbox-wrapper" style="--wpd-grid-columns: ' . esc_attr($columns) . ';">';
+                                foreach($image_options as $option) {
+                                    $image_id = $option['image_id'] ?? 0;
+                                    $image_url = $image_id ? wp_get_attachment_image_url($image_id, 'thumbnail') : '';
+                                    if (!$image_url) {
+                                        $placeholder_text = urlencode($option['title']);
+                                        $image_url = "https://placehold.co/150x150/EFEFEF/AAAAAA?text={$placeholder_text}";
+                                    }
+                                    $checked = in_array($option['value'], $saved_values) ? 'checked' : '';
+
+                                    echo '<label class="wpd-image-checkbox-label">';
+                                    echo '<input type="checkbox" name="' . esc_attr($field_name) . '[]" value="' . esc_attr($option['value']) . '" ' . $checked . '>';
+                                    echo '<div class="wpd-image-checkbox-content">';
+                                    echo '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($option['title']) . '">';
+                                    echo '<span>' . esc_html($option['title']) . '</span>';
+                                    echo '</div>';
+                                    echo '</label>';
+                                }
+                                echo '</div>';
+                            }
+                            break;
                         case 'radio':
                             foreach ($options as $option) {
                                 echo '<label><input type="radio" name="' . esc_attr($field_name) . '" value="' . esc_attr($option) . '" ' . checked($value, $option, false) . '> ' . esc_html($option) . '</label>';
@@ -1234,3 +1261,4 @@ if ( ! class_exists( 'Directory_Frontend' ) ) {
         }
     }
 }
+

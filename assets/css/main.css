@@ -564,7 +564,7 @@ button[type="submit"]:hover {
 
 .wpd-social-icon-youtube {
     background-color: #ff0000;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M21.582 7.303c-.246-1.21-.736-2.21-1.23-2.704C19.355 3.6 16.355 3 12 3s-7.355.6-8.352 1.599c-.494.494-.984 1.494-1.23 2.704C2.06 8.513 2 10.14 2 12s.06 3.487.418 4.697c.246 1.21.736 2.21 1.23 2.704C4.645 20.4 7.645 21 12 21s7.355-.6 8.352-1.599c.494-.494.984-1.494 1.23-2.704C21.94 15.487 22 13.86 22 12s-.06-3.487-.418-4.697zM9.75 15.5V8.5l6.5 3.5-6.5 3.5z"/></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M21.582 7.303c-.246-1.21-.736-2.21-1.23-2.704C19.355 3.6 16.355 3 12 3s-7.355.6-8.352 1.599c-.494.494-.984 1.494-1.23 2.704C2.06 8.513 2 10.14 2 12s.06 3.487.418 4.697c.246 1.21.736 2.21 1.23 2.704C4.645 20.4 7.645 21 12 21s7.355-.6 8.352-1.599c.494.494.984-1.494 1.23-2.704C21.94 15.487 22 13.86 22 12s-.06-3.487-.418-4.697zM9.75 15.5V8.5l6.5 3.5-6.5 3.5z"/></svg>');
 }
 
 .wpd-social-icon-aparat {
@@ -575,4 +575,102 @@ button[type="submit"]:hover {
 .wpd-social-icon-website {
     background-color: #4a4a4a;
     background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93s3.05-7.44 7-7.93v15.86zm2-15.86c3.95.49 7 3.85 7 7.93s-3.05 7.44-7 7.93V4.07z"/></svg>');
+}
+
+/* -----------------------------------------
+   9. NEW: Image Checkbox Field Styles
+   ----------------------------------------- */
+
+/* Form Styles */
+.wpd-image-checkbox-wrapper {
+    display: grid;
+    grid-template-columns: repeat(var(--wpd-grid-columns, 3), 1fr);
+    gap: 15px;
+}
+
+.wpd-image-checkbox-label {
+    display: block;
+    cursor: pointer;
+    position: relative;
+}
+
+.wpd-image-checkbox-label input[type="checkbox"] {
+    display: none;
+    /* Hide the default checkbox */
+}
+
+.wpd-image-checkbox-content {
+    border: 2px solid var(--wpd-border-color);
+    border-radius: var(--wpd-border-radius);
+    padding: 10px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.wpd-image-checkbox-content:hover {
+    border-color: var(--wpd-primary-hover-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wpd-image-checkbox-content img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: calc(var(--wpd-border-radius) - 2px);
+    margin-bottom: 10px;
+}
+
+.wpd-image-checkbox-content span {
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.wpd-image-checkbox-label input[type="checkbox"]:checked+.wpd-image-checkbox-content {
+    border-color: var(--wpd-primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.2);
+}
+
+.wpd-image-checkbox-label input[type="checkbox"]:checked+.wpd-image-checkbox-content::after {
+    content: '✔';
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    background-color: var(--wpd-primary-color);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+/* Single Listing Display Styles */
+.wpd-image-checkbox-display-wrapper {
+    display: grid;
+    grid-template-columns: repeat(var(--wpd-grid-columns, 3), 1fr);
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.wpd-image-checkbox-display-item {
+    background-color: var(--wpd-secondary-color);
+    border-radius: var(--wpd-border-radius);
+    padding: 10px;
+    text-align: center;
+}
+
+.wpd-image-checkbox-display-item img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: calc(var(--wpd-border-radius) - 2px);
+    margin-bottom: 10px;
+}
+
+.wpd-image-checkbox-display-item span {
+    font-weight: 600;
+    font-size: 0.9em;
 }
